@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+from contextlib import asynccontextmanager
 import hashlib
 import io
 import json
@@ -13,18 +14,21 @@ import os
 import re
 import textwrap
 import uuid
+import webbrowser
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Literal
 from urllib.parse import urlsplit
 
 import httpx
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from openai import AsyncOpenAI
 from PIL import Image, ImageDraw, ImageOps
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 from generators.flux import gerar_flux
 from generators.kittl_automation import gerar_kittl
@@ -320,21 +324,27 @@ def _local_llm_settings() -> tuple[str, str, str]:
     return api_key, base_url, model
 
 
-async def expandir_estetica_midjourney(
-    estetica: str,
+async def expandir_direcao_visual_midjourney(
+    direcao_visual: str,
     quantidade: int = 1,
 ) -> list[str]:
     """Ask the local LLM for validated Midjourney prompt variants."""
-    if not estetica.strip():
-        raise ValueError("The requested aesthetic must not be empty")
+    if not direcao_visual.strip():
+        raise ValueError("The visual direction must not be empty")
     if not 1 <= quantidade <= TARGET_COUNT:
         raise ValueError(f"Midjourney prompt count must be between 1 and {TARGET_COUNT}")
 
     api_key, base_url, model = _local_llm_settings()
     request_text = (
-        f"Expanda esta direção estética em exatamente {quantidade} prompts "
-        "distintos para geração no Midjourney:\n"
-        f"{estetica}\n\n"
+        f"Transforme esta direção de arte em exatamente {quantidade} prompts "
+        "distintos para geração no Midjourney. Priorize técnicas visuais, "
+        "elementos e princípios de design que comuniquem a intenção; não reduza "
+        "a proposta a um rótulo de estilo. Quando houver narrativa, explore "
+        "ponto de partida, virada e ideia que permanece. Descreva hierarquia, "
+        "ponto de entrada do olhar, ritmo e metáfora visual como escolhas para "
+        "o diretor experimentar; não declare efeitos universais sobre emoções "
+        "ou respostas neuropsicológicas:\n"
+        f"{direcao_visual}\n\n"
         "Responda somente com JSON válido no formato "
         '{"variations":[{"prompt":"descrição visual","sref":null,'
         '"stylize":100,"ar":"3:2"}]}. '
@@ -409,6 +419,14 @@ async def expandir_estetica_midjourney(
     return prompts
 
 
+async def expandir_estetica_midjourney(
+    estetica: str,
+    quantidade: int = 1,
+) -> list[str]:
+    """Compatibility wrapper for callers using the original aesthetic name."""
+    return await expandir_direcao_visual_midjourney(estetica, quantidade)
+
+
 def _write_mock_image(provider: str, prompt: str, destination: Path) -> Path:
     digest = hashlib.sha256(f"{provider}:{prompt}".encode("utf-8")).digest()
     background = tuple(40 + value % 150 for value in digest[:3])
@@ -472,7 +490,7 @@ async def gerar_imagens(
             )
         if reference_url:
             _validate_midjourney_reference_url(reference_url)
-        prompts = await expandir_estetica_midjourney(criterio, deficit)
+        prompts = await expandir_direcao_visual_midjourney(criterio, deficit)
     else:
         prompts = [
             (
@@ -723,7 +741,10 @@ async def executar_pipeline_pasta(
     output_key: str | None = None,
     reference_image: Path | None = None,
     reference_url: str | None = None,
+    target_count: int | None = None,
 ) -> dict[str, object]:
+    if target_count is None:
+        target_count = TARGET_COUNT
     checkpoint_path = local_dir / CHECKPOINT_FILENAME
     if checkpoint_path.is_file():
         print(f"Pasta já processada; ignorando: {folder_name}")
@@ -750,8 +771,8 @@ async def executar_pipeline_pasta(
         raise FileNotFoundError(f"No supported images found in {local_dir}")
 
     criterion = criterio.strip()
-    selected = await selecionar_imagens(paths, criterion)
-    deficit = TARGET_COUNT - len(selected)
+    selected = await selecionar_imagens(paths, criterion, target_count)
+    deficit = target_count - len(selected)
     print(f"LLM local selecionou {len(selected)} imagens; déficit: {deficit}.")
 
     key = _safe_path_segment(output_key or folder_name)
@@ -771,9 +792,9 @@ async def executar_pipeline_pasta(
         reference_url=reference_url,
     )
     final_sources = [asset.path for asset in selected] + generated
-    if len(final_sources) != TARGET_COUNT:
+    if len(final_sources) != target_count:
         raise RuntimeError(
-            f"Expected {TARGET_COUNT} final images, received {len(final_sources)}"
+            f"Expected {target_count} final images, received {len(final_sources)}"
         )
     webp_paths = await converter_webp(final_sources, run_dir / "webp")
     print(f"{len(webp_paths)} arquivos WebP salvos em {run_dir / 'webp'}.")
@@ -848,7 +869,10 @@ async def processar_pastas_locais(
     progress_callback: ProgressCallback | None = None,
     reference_image: Path | None = None,
     reference_url: str | None = None,
+    target_count: int | None = None,
 ) -> dict[str, object]:
+    if target_count is None:
+        target_count = TARGET_COUNT
     load_env()
     folders = await asyncio.to_thread(_discover_local_image_folders, root)
     if not folders:
@@ -904,6 +928,7 @@ async def processar_pastas_locais(
                     output_key=folder_label,
                     reference_image=reference_image,
                     reference_url=reference_url,
+                    target_count=target_count,
                 )
                 if result["status"] == "skipped":
                     summary["skipped"] = int(summary["skipped"]) + 1
@@ -932,10 +957,52 @@ async def processar_pastas_locais(
 class CuradoriaRequest(BaseModel):
     criterio: str = Field(default=DEFAULT_CRITERION, min_length=1, max_length=4000)
     reference_url: str | None = Field(default=None, max_length=2048)
+    pasta_raiz: str | None = Field(default=None, max_length=4096)
+    meta_imagens: int = Field(default=TARGET_COUNT, ge=1, le=TARGET_COUNT)
+
+
+class ExploracaoDirecaoRequest(BaseModel):
+    brief: str = Field(
+        min_length=1,
+        max_length=4000,
+        validation_alias=AliasChoices("brief", "estetica"),
+    )
+    quantidade: int = Field(default=5, ge=1, le=TARGET_COUNT)
+
+
+class DirecaoArteRequest(BaseModel):
+    prompt_template: str = Field(min_length=1, max_length=4000)
+    variacoes: list[str] = Field(
+        min_length=1,
+        max_length=1001,
+        validation_alias=AliasChoices("variacoes", "esteticas"),
+    )
+    prompts: list[str] | None = Field(default=None, max_length=1001)
+    motor: Literal["midjourney", "kittl", "flux"]
+    image_path: str | None = Field(default=None, max_length=4096)
+    image_data: str | None = Field(default=None, max_length=28_000_000)
+
+
+ClonagemRequest = DirecaoArteRequest
 
 
 load_env()
-app = FastAPI(title="OpenMontage Image Curation")
+
+
+@asynccontextmanager
+async def _app_lifespan(_app: FastAPI):
+    if os.environ.get("IDSTUDIO_AUTO_OPEN_BROWSER", "true").lower() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        webbrowser.open(
+            os.environ.get("IDSTUDIO_URL", "http://127.0.0.1:8000")
+        )
+    yield
+
+
+app = FastAPI(title="OpenMontage Image Curation", lifespan=_app_lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -950,29 +1017,71 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 curation_jobs: dict[str, dict[str, object]] = {}
+OUTPUT_DIR = REPO_ROOT / "output" / "pipeline_imagens"
+
+
+@app.get("/", include_in_schema=False)
+async def painel_idstudio() -> FileResponse:
+    return FileResponse(REPO_ROOT / "static" / "index.html")
+
+
+app.mount(
+    "/generated",
+    StaticFiles(directory=OUTPUT_DIR, check_dir=False),
+    name="generated",
+)
+
+
+def _job_is_active() -> bool:
+    return any(
+        job.get("status") in {"queued", "running"}
+        for job in curation_jobs.values()
+    )
+
+
+def _job_thumbnails() -> list[str]:
+    if not OUTPUT_DIR.is_dir():
+        return []
+    images = sorted(
+        (
+            path
+            for path in OUTPUT_DIR.rglob("*")
+            if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS
+        ),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )[:8]
+    return [
+        "/generated/" + path.relative_to(OUTPUT_DIR).as_posix()
+        for path in images
+    ]
 
 
 async def _run_api_job(
     job_id: str,
     criterio: str,
     reference_url: str | None = None,
+    root: Path = DEFAULT_INPUT_DIR,
+    target_count: int = TARGET_COUNT,
 ) -> None:
     job = curation_jobs[job_id]
     job["status"] = "running"
 
     async def report_progress(update: dict[str, object]) -> None:
         job.update(update)
+        job["thumbnails"] = _job_thumbnails()
 
     try:
         summary = await processar_pastas_locais(
-            root=DEFAULT_INPUT_DIR,
+            root=root,
             criterio=criterio,
-            output_dir=REPO_ROOT / "output" / "pipeline_imagens",
+            output_dir=OUTPUT_DIR,
             titulo=f"Curadoria {date.today().isoformat()}",
             database_id=os.environ.get("NOTION_DATABASE_ID", ""),
             parent_page_id=os.environ.get("NOTION_PARENT_PAGE_ID", ""),
             progress_callback=report_progress,
             reference_url=reference_url,
+            target_count=target_count,
         )
         job.update(summary)
         job["status"] = "completed_with_errors" if int(summary["failed"]) else "completed"
@@ -980,6 +1089,61 @@ async def _run_api_job(
         job["status"] = "failed"
         job["error"] = f"{type(exc).__name__}: {exc}"
         raise
+
+
+async def _run_clone_job(
+    job_id: str,
+    variacoes: list[str],
+    motor: Literal["midjourney", "kittl", "flux"],
+    reference_image: Path | None,
+) -> None:
+    job = curation_jobs[job_id]
+    job.update({"status": "running", "total": len(variacoes)})
+    errors: list[dict[str, str]] = []
+    generated: list[str] = []
+    items = job["items"]
+    assert isinstance(items, list)
+    destination_dir = OUTPUT_DIR / "direcao_arte" / job_id
+
+    for index, variacao in enumerate(variacoes, start=1):
+        destination = destination_dir / f"{motor}_{index:04d}.png"
+        job["current_folder"] = variacao
+        item = items[index - 1]
+        assert isinstance(item, dict)
+        prompt = item["prompt"]
+        assert isinstance(prompt, str)
+        item["status"] = "running"
+        try:
+            if motor == "flux":
+                image_path = await gerar_flux(prompt, destination)
+            elif motor == "kittl":
+                image_path = await gerar_kittl(prompt, destination)
+            else:
+                image_path = await gerar_midjourney_web(
+                    prompt,
+                    destination,
+                    reference_image=reference_image,
+                )
+            thumbnail = "/generated/" + image_path.relative_to(OUTPUT_DIR).as_posix()
+            generated.append(thumbnail)
+            item.update({"status": "completed", "thumbnail": thumbnail})
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+            errors.append({"variacao": variacao, "error": error})
+            item.update({"status": "failed", "error": error})
+
+        job.update(
+            {
+                "completed": index,
+                "processed": len(generated),
+                "failed": len(errors),
+                "errors": errors,
+                "thumbnails": generated[-8:],
+            }
+        )
+
+    job["current_folder"] = None
+    job["status"] = "completed_with_errors" if errors else "completed"
 
 
 @app.post("/iniciar-curadoria", status_code=202)
@@ -995,8 +1159,16 @@ async def iniciar_curadoria(
             _validate_midjourney_reference_url(request.reference_url)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-    active_statuses = {"queued", "running"}
-    if any(job.get("status") in active_statuses for job in curation_jobs.values()):
+    root = (
+        Path(request.pasta_raiz).expanduser()
+        if request.pasta_raiz
+        else DEFAULT_INPUT_DIR
+    )
+    if request.pasta_raiz is None:
+        root.mkdir(parents=True, exist_ok=True)
+    if not root.is_dir():
+        raise HTTPException(status_code=422, detail=f"Folder not found: {root}")
+    if _job_is_active():
         raise HTTPException(status_code=409, detail="A curation job is already active")
     DEFAULT_INPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -1017,16 +1189,174 @@ async def iniciar_curadoria(
         job_id,
         request.criterio.strip(),
         request.reference_url,
+        root,
+        request.meta_imagens,
+    )
+    return {"job_id": job_id, "status": "queued"}
+
+
+@app.post("/iniciar-direcao", status_code=202)
+@app.post("/iniciar-clonagem", status_code=202, include_in_schema=False)
+async def iniciar_direcao_arte(
+    request: DirecaoArteRequest,
+    background_tasks: BackgroundTasks,
+) -> dict[str, object]:
+    if "{variavel}" not in request.prompt_template:
+        raise HTTPException(
+            status_code=422,
+            detail="prompt_template must include the {variavel} placeholder",
+        )
+    variacoes = [item.strip() for item in request.variacoes]
+    if any(not item for item in variacoes):
+        raise HTTPException(
+            status_code=422,
+            detail="Variation entries must not be empty",
+        )
+    prompts = request.prompts
+    if prompts is not None:
+        if len(prompts) != len(variacoes):
+            raise HTTPException(
+                status_code=422,
+                detail="Provide exactly one prompt for each variation",
+            )
+        prompts = [prompt.strip() for prompt in prompts]
+        if any(not prompt for prompt in prompts):
+            raise HTTPException(status_code=422, detail="Prompts must not be empty")
+    if bool(request.image_path) and request.image_data is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide either image_path or image_data, not both",
+        )
+    if (
+        (request.image_path or request.image_data is not None)
+        and request.motor != "midjourney"
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Only Midjourney Web currently accepts an image reference",
+        )
+    if _job_is_active():
+        raise HTTPException(status_code=409, detail="Another image job is already active")
+
+    job_id = uuid.uuid4().hex
+    reference_image = None
+    if request.image_path:
+        reference_image = Path(request.image_path).expanduser()
+        if not reference_image.is_file():
+            raise HTTPException(
+                status_code=422,
+                detail=f"Reference image not found: {reference_image}",
+            )
+        if reference_image.stat().st_size > 20 * 1024 * 1024:
+            raise HTTPException(
+                status_code=413,
+                detail="Reference images must be 20 MiB or smaller",
+            )
+        try:
+            with Image.open(reference_image) as image:
+                image.verify()
+        except (OSError, ValueError) as exc:
+            raise HTTPException(
+                status_code=422,
+                detail="Invalid reference image",
+            ) from exc
+    elif request.image_data is not None:
+        try:
+            encoded = request.image_data.partition(",")[2] or request.image_data
+            image_bytes = base64.b64decode(encoded, validate=True)
+            if len(image_bytes) > 20 * 1024 * 1024:
+                raise HTTPException(
+                    status_code=413,
+                    detail="Reference images must be 20 MiB or smaller",
+                )
+            with Image.open(io.BytesIO(image_bytes)) as image:
+                image_format = image.format
+                image.verify()
+        except (OSError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail="Invalid reference image") from exc
+        extension = {"JPEG": ".jpg", "PNG": ".png", "WEBP": ".webp"}.get(
+            image_format or ""
+        )
+        if extension is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Reference image must be JPEG, PNG, or WebP",
+            )
+        reference_image = OUTPUT_DIR / "direcao_arte" / job_id / f"reference{extension}"
+        reference_image.parent.mkdir(parents=True, exist_ok=True)
+        reference_image.write_bytes(image_bytes)
+
+    curation_jobs[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "total": len(variacoes),
+        "completed": 0,
+        "processed": 0,
+        "failed": 0,
+        "errors": [],
+        "current_folder": None,
+        "thumbnails": [],
+        "items": [
+            {
+                "index": index,
+                "variacao": variacao,
+                "estetica": variacao,
+                "prompt": (
+                    prompts[index - 1]
+                    if prompts is not None
+                    else request.prompt_template.replace("{variavel}", variacao)
+                ),
+                "motor": request.motor,
+                "status": "queued",
+                "thumbnail": None,
+                "error": None,
+            }
+            for index, variacao in enumerate(variacoes, start=1)
+        ],
+    }
+    background_tasks.add_task(
+        _run_clone_job,
+        job_id,
+        variacoes,
+        request.motor,
+        reference_image,
     )
     return {"job_id": job_id, "status": "queued"}
 
 
 @app.get("/progresso/{job_id}")
-async def progresso_curadoria(job_id: str) -> dict[str, object]:
+async def progresso_curadoria(
+    job_id: str,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=50),
+) -> dict[str, object]:
     job = curation_jobs.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Curation job not found")
-    return dict(job)
+    snapshot = dict(job)
+    items = snapshot.get("items")
+    if isinstance(items, list):
+        start = (page - 1) * page_size
+        snapshot["items_total"] = len(items)
+        snapshot["items_page"] = page
+        snapshot["items_page_size"] = page_size
+        snapshot["items"] = items[start : start + page_size]
+    return snapshot
+
+
+@app.post("/explorar-direcao")
+@app.post("/explorar-estetica", include_in_schema=False)
+async def explorar_direcao(
+    request: ExploracaoDirecaoRequest,
+) -> dict[str, list[str]]:
+    try:
+        prompts = await expandir_direcao_visual_midjourney(
+            request.brief.strip(),
+            quantidade=request.quantidade,
+        )
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"prompts": prompts}
 
 
 async def executar_pipeline(args: argparse.Namespace) -> None:

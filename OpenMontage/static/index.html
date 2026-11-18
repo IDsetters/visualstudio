@@ -1,0 +1,1373 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#09090b">
+  <title>IDstudio — Painel de Direção de Arte &amp; Automação</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: "#09090b",
+            panel: "#111114",
+            line: "#27272a",
+            violet: "#a78bfa",
+            mint: "#6ee7b7"
+          },
+          fontFamily: {
+            sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root { color-scheme: dark; }
+    html { scroll-behavior: smooth; }
+    body { background: radial-gradient(ellipse at 70% -14%, rgba(167, 139, 250, .11), transparent 40%), radial-gradient(ellipse at 0% 50%, rgba(110, 231, 183, .035), transparent 34%), #09090b; }
+    input, textarea, select { color-scheme: dark; }
+    .tab-button[aria-selected="true"] { color: #ddd6fe; background: rgba(139, 92, 246, .13); border-color: rgba(167, 139, 250, .4); }
+    .tab-panel[hidden] { display: none; }
+    :focus-visible { outline: 2px solid #c4b5fd; outline-offset: 3px; }
+    button, summary { -webkit-tap-highlight-color: transparent; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body class="min-h-screen text-zinc-100 antialiased">
+  <div class="mx-auto max-w-[1500px] px-5 py-7 sm:px-8 lg:px-10">
+    <header class="mb-9 flex flex-wrap items-center justify-between gap-5">
+      <a href="/" class="flex items-center gap-3" aria-label="IDstudio início">
+        <span class="grid size-11 place-items-center rounded-2xl bg-violet-400/15 text-lg font-black text-violet-300 ring-1 ring-violet-300/25">ID</span>
+        <span>
+          <span class="block text-sm font-bold tracking-wide">IDstudio</span>
+          <span class="block text-xs text-zinc-500">Um estúdio criativo da IDsetters</span>
+        </span>
+      </a>
+      <div class="flex items-center gap-2 rounded-full border border-line bg-panel px-3 py-2 text-xs text-zinc-400" role="status" aria-live="polite">
+        <span id="connection-indicator" class="size-2 rounded-full bg-mint"></span>
+        <span id="connection-label">Painel local pronto</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-end">
+        <div>
+          <p class="mb-3 text-xs font-semibold uppercase tracking-[.24em] text-violet-300">IDSETTERS · CREATIVE INTELLIGENCE</p>
+          <h1 class="max-w-3xl text-3xl font-semibold tracking-tight sm:text-5xl">Ideias visuais, com intenção.</h1>
+          <p class="mt-4 max-w-2xl text-sm leading-6 text-zinc-400">Investigue como as imagens comunicam, conecte técnicas e transforme uma leitura em narrativas visuais próprias.</p>
+        </div>
+        <div class="rounded-2xl border border-line bg-panel/80 p-4">
+          <p class="text-xs uppercase tracking-wider text-zinc-500">Sessão</p>
+          <p class="mt-2 text-sm font-medium">Workspace local <span class="ml-1 text-mint">●</span></p>
+          <p class="mt-1 text-xs text-zinc-500">Um espaço de exploração, não uma fórmula de gosto.</p>
+        </div>
+      </section>
+
+      <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_350px]">
+        <section class="min-w-0">
+          <nav class="mb-5 flex flex-wrap gap-2" role="tablist" aria-label="Ferramentas IDstudio">
+            <button class="tab-button rounded-xl border border-line bg-panel px-4 py-3 text-left text-sm text-zinc-400 transition hover:text-white" role="tab" id="tab-curadoria" aria-controls="panel-curadoria" aria-selected="true" data-tab="curadoria">
+              <span class="block text-[10px] uppercase tracking-widest text-zinc-500">01 · Organizar</span>
+              <span class="mt-1 block font-medium">Curadoria de Pastas</span>
+            </button>
+            <button class="tab-button rounded-xl border border-line bg-panel px-4 py-3 text-left text-sm text-zinc-400 transition hover:text-white" role="tab" id="tab-clonagem" aria-controls="panel-clonagem" aria-selected="false" data-tab="clonagem">
+              <span class="block text-[10px] uppercase tracking-widest text-zinc-500">02 · Dirigir</span>
+              <span class="mt-1 block font-medium">Mesa de Direção</span>
+            </button>
+            <button class="tab-button rounded-xl border border-line bg-panel px-4 py-3 text-left text-sm text-zinc-400 transition hover:text-white" role="tab" id="tab-explorador" aria-controls="panel-explorador" aria-selected="false" data-tab="explorador">
+              <span class="block text-[10px] uppercase tracking-widest text-zinc-500">03 · Explorar</span>
+              <span class="mt-1 block font-medium">Explorador Visual</span>
+            </button>
+          </nav>
+
+          <section class="tab-panel rounded-2xl border border-line bg-panel/90 p-5 sm:p-7" id="panel-curadoria" role="tabpanel" aria-labelledby="tab-curadoria">
+            <div class="mb-7 flex items-start justify-between gap-4">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[.2em] text-violet-300">01 / Curadoria</p>
+                <h2 class="mt-2 text-xl font-semibold">1001 Pastas</h2>
+                <p class="mt-2 max-w-xl text-sm leading-6 text-zinc-400">Selecione imagens com apoio do modelo local, complete a meta e acompanhe o processamento.</p>
+              </div>
+              <span class="hidden rounded-lg border border-line px-3 py-2 text-xs text-zinc-400 sm:block">Meta padrão <strong class="text-white">16 imagens</strong></span>
+            </div>
+            <form id="curation-form" class="space-y-5">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium">Caminho da pasta raiz</span>
+                <input id="folder-path" name="pasta_raiz" type="text" placeholder="/caminho/para/suas/pastas" class="w-full rounded-xl border border-line bg-ink px-4 py-3 text-sm outline-none transition placeholder:text-zinc-600 focus:border-violet-400/60 focus:ring-2 focus:ring-violet-400/10">
+                <span class="mt-2 block text-xs text-zinc-500">Pasta local no computador onde o servidor está rodando; cada subpasta com imagens será processada.</span>
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium">Critério de seleção visual</span>
+                <textarea id="curation-criterion" rows="3" required class="w-full resize-y rounded-xl border border-line bg-ink px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-zinc-600 focus:border-violet-400/60 focus:ring-2 focus:ring-violet-400/10" placeholder="Ex.: hierarquia clara, contraste de escala, composição dinâmica, boa legibilidade…">Selecione imagens visualmente fortes, nítidas, coerentes entre si e adequadas para uma coleção editorial. Evite duplicatas, imagens borradas, com composição confusa ou marcas d'água.</textarea>
+              </label>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="block">
+                  <span class="mb-2 block text-sm font-medium">Meta de imagens por pasta</span>
+                  <input id="image-target" type="number" min="1" max="16" value="16" required class="w-full rounded-xl border border-line bg-ink px-4 py-3 text-sm outline-none focus:border-violet-400/60">
+                </label>
+                <label class="block">
+                  <span class="mb-2 block text-sm font-medium">Referência Midjourney (opcional)</span>
+                  <input id="reference-url" type="url" placeholder="https://…" class="w-full rounded-xl border border-line bg-ink px-4 py-3 text-sm outline-none placeholder:text-zinc-600 focus:border-violet-400/60">
+                </label>
+              </div>
+              <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-300 px-5 py-4 text-sm font-bold text-zinc-950 transition hover:bg-violet-200 disabled:cursor-wait disabled:opacity-60">
+                <span>Disparar curadoria</span><span aria-hidden="true">↗</span>
+              </button>
+              <p id="curation-message" class="min-h-5 text-sm text-zinc-400" role="status"></p>
+            </form>
+          </section>
+
+          <section class="tab-panel rounded-2xl border border-line bg-panel/90 p-5 sm:p-7" id="panel-clonagem" role="tabpanel" aria-labelledby="tab-clonagem" hidden>
+            <div class="mb-7">
+              <p class="text-xs font-semibold uppercase tracking-[.2em] text-violet-300">02 / Direção de arte</p>
+              <h2 class="mt-2 text-xl font-semibold">Mesa de Direção de Arte</h2>
+              <p class="mt-2 max-w-xl text-sm leading-6 text-zinc-400">Transforme uma intenção em um sistema visual. Explore relações entre elementos, princípios e técnicas — sem depender de um estilo pronto.</p>
+              <ol class="mt-5 grid gap-2 sm:grid-cols-4" aria-label="Workflow de direção de arte">
+                <li class="rounded-xl border border-line bg-ink/70 p-3"><span class="text-[10px] font-semibold tracking-widest text-violet-300">01 · BRIEF</span><span class="mt-1 block text-xs text-zinc-400">O que precisa comunicar?</span></li>
+                <li class="rounded-xl border border-line bg-ink/70 p-3"><span class="text-[10px] font-semibold tracking-widest text-violet-300">02 · ELEMENTOS</span><span class="mt-1 block text-xs text-zinc-400">Com o que construir?</span></li>
+                <li class="rounded-xl border border-line bg-ink/70 p-3"><span class="text-[10px] font-semibold tracking-widest text-violet-300">03 · PRINCÍPIOS</span><span class="mt-1 block text-xs text-zinc-400">Como organizar?</span></li>
+                <li class="rounded-xl border border-line bg-ink/70 p-3"><span class="text-[10px] font-semibold tracking-widest text-violet-300">04 · TÉCNICAS</span><span class="mt-1 block text-xs text-zinc-400">Que operação explorar?</span></li>
+              </ol>
+            </div>
+            <form id="clone-form" class="space-y-5">
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="block">
+                  <span class="mb-2 block text-sm font-medium">Peça / assunto</span>
+                  <input id="direction-subject" type="text" required class="w-full rounded-xl border border-line bg-ink px-4 py-3 text-sm outline-none placeholder:text-zinc-600 focus:border-violet-400/60" placeholder="Ex.: cartaz para lançamento de um livro de arquitetura">
+                </label>
+                <label class="block">
+                  <span class="mb-2 block text-sm font-medium">Intenção de comunicação</span>
+                  <input id="direction-intention" type="text" class="w-full rounded-xl border border-line bg-ink px-4 py-3 text-sm outline-none placeholder:text-zinc-600 focus:border-violet-400/60" placeholder="Ex.: transmitir precisão e curiosidade">
+                </label>
+              </div>
+              <details class="rounded-xl border border-line bg-ink/60 p-4">
+                <summary class="cursor-pointer list-none text-sm font-semibold text-zinc-200">
+                  <span class="mr-2 text-violet-300">＋</span>Narrativa visual
+                  <span class="ml-1 text-xs font-normal text-zinc-500">· o que muda para quem vê?</span>
+                </summary>
+                <div class="mt-4 grid gap-3 md:grid-cols-3">
+                  <label class="block rounded-lg border border-line/70 bg-panel/70 p-3">
+                    <span class="mb-2 block text-[10px] font-semibold uppercase tracking-widest text-zinc-500">01 · Antes</span>
+                    <textarea id="story-start" rows="2" class="w-full resize-y bg-transparent text-sm leading-5 outline-none placeholder:text-zinc-600" placeholder="O que a pessoa sabe ou sente ao chegar?"></textarea>
+                  </label>
+                  <label class="block rounded-lg border border-line/70 bg-panel/70 p-3">
+                    <span class="mb-2 block text-[10px] font-semibold uppercase tracking-widest text-zinc-500">02 · Virada</span>
+                    <textarea id="story-shift" rows="2" class="w-full resize-y bg-transparent text-sm leading-5 outline-none placeholder:text-zinc-600" placeholder="Que descoberta ou tensão desloca o olhar?"></textarea>
+                  </label>
+                  <label class="block rounded-lg border border-line/70 bg-panel/70 p-3">
+                    <span class="mb-2 block text-[10px] font-semibold uppercase tracking-widest text-zinc-500">03 · Depois</span>
+                    <textarea id="story-end" rows="2" class="w-full resize-y bg-transparent text-sm leading-5 outline-none placeholder:text-zinc-600" placeholder="Que ideia, sensação ou ação fica?"></textarea>
+                  </label>
+                </div>
+                <label class="mt-3 block">
+                  <span class="mb-2 block text-xs font-medium text-zinc-400">Público e contexto <span class="font-normal text-zinc-600">· opcional</span></span>
+                  <input id="story-audience" type="text" class="w-full rounded-lg border border-line bg-ink px-3 py-2.5 text-sm outline-none placeholder:text-zinc-600 focus:border-violet-400/60" placeholder="Quem verá esta peça, onde e em que situação?">
+                </label>
+              </details>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="block">
+                  <span class="mb-2 block text-sm font-medium">Enviar imagem base <span class="font-normal text-zinc-500">· referência para Midjourney</span></span>
+                  <input id="base-image" type="file" accept="image/jpeg,image/png,image/webp" class="block w-full rounded-xl border border-line bg-ink px-3 py-2.5 text-xs text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-xs file:text-zinc-200">
+                </label>
+                <label class="block">
+                  <span class="mb-2 block text-sm font-medium">Ou caminho da imagem</span>
+                  <input id="base-image-path" type="text" placeholder="/caminho/para/referencia.jpg" class="w-full rounded-xl border border-line bg-ink px-4 py-3 text-sm outline-none placeholder:text-zinc-600 focus:border-violet-400/60">
+                </label>
+              </div>
+              <fieldset class="rounded-xl border border-line bg-ink/60 p-4">
+                <legend class="px-1 text-sm font-semibold">Estética <span class="font-normal text-zinc-500">· uma linguagem visual, não o brief inteiro</span></legend>
+                <p class="mb-3 text-xs leading-5 text-zinc-500">Escolha uma ou mais direções para comparar, combine com princípios e técnicas, ou adicione a sua.</p>
+                <div id="visual-aesthetic-choices" class="flex flex-wrap gap-2"></div>
+                <label class="mt-4 block">
+                  <span class="mb-2 block text-xs font-medium text-zinc-400">Outras estéticas <span class="font-normal text-zinc-600">· separadas por vírgula</span></span>
+                  <input id="custom-aesthetics" type="text" class="w-full rounded-lg border border-line bg-ink px-3 py-2.5 text-sm outline-none placeholder:text-zinc-600 focus:border-violet-400/60" placeholder="Ex.: brutalismo tropical, editorial artesanal">
+                </label>
+              </fieldset>
+              <details class="rounded-xl border border-line bg-ink/60 p-4">
+                <summary class="cursor-pointer list-none text-sm font-semibold text-zinc-200">
+                  <span class="mr-2 text-violet-300">＋</span>Elementos e princípios
+                  <span class="ml-1 text-xs font-normal text-zinc-500">· personalize o que entra e como se organiza</span>
+                </summary>
+                <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                <fieldset class="rounded-xl border border-line bg-ink/60 p-4">
+                  <legend class="px-1 text-sm font-semibold">Elementos visuais <span class="font-normal text-zinc-500">· escolha os materiais</span></legend>
+                  <div id="visual-element-choices" class="mt-2 flex flex-wrap gap-2"></div>
+                  <label class="mt-3 flex items-center gap-2 text-[11px] text-zinc-500"><input id="compare-elements" type="checkbox" class="size-3.5 accent-violet-300">Variar um elemento por prompt</label>
+                </fieldset>
+                <fieldset class="rounded-xl border border-line bg-ink/60 p-4">
+                  <legend class="px-1 text-sm font-semibold">Princípios de design <span class="font-normal text-zinc-500">· escolha a lógica</span></legend>
+                  <div id="design-principle-choices" class="mt-2 flex flex-wrap gap-2"></div>
+                  <label class="mt-3 flex items-center gap-2 text-[11px] text-zinc-500"><input id="compare-principles" type="checkbox" class="size-3.5 accent-violet-300">Variar um princípio por prompt</label>
+                </fieldset>
+                </div>
+              </details>
+              <fieldset class="rounded-xl border border-line bg-ink/60 p-4">
+                <legend class="px-1 text-sm font-semibold">Técnicas para explorar <span class="font-normal text-zinc-500">· cada técnica vira uma variação</span></legend>
+                <div id="visual-technique-choices" class="mt-2 grid gap-2 sm:grid-cols-2"></div>
+                <label class="mt-4 block">
+                  <span class="mb-2 flex items-center justify-between gap-3 text-xs font-medium text-zinc-400">
+                    <span>Outras técnicas ou operações visuais</span>
+                    <span id="variation-counter" class="shrink-0 tabular-nums">0 opções</span>
+                  </span>
+                  <textarea id="variation-list" rows="2" class="w-full resize-y rounded-lg border border-line bg-ink px-3 py-2.5 text-sm leading-5 outline-none placeholder:text-zinc-600 focus:border-violet-400/60" placeholder="Uma técnica, elemento ou regra visual por linha…"></textarea>
+                </label>
+              </fieldset>
+              <details class="rounded-xl border border-line bg-ink/60 p-4">
+                <summary class="cursor-pointer list-none text-sm font-semibold text-zinc-200">
+                  <span class="mr-2 text-violet-300">＋</span>Outros parâmetros
+                  <span class="ml-1 text-xs font-normal text-zinc-500">· cor, público, época, lente, material…</span>
+                </summary>
+                <p class="mt-3 text-xs leading-5 text-zinc-500">Crie eixos próprios. Os valores de cada eixo serão combinados com as escolhas acima para montar as variações.</p>
+                <div id="custom-parameter-rows" class="mt-3 space-y-3"></div>
+                <button id="add-parameter" type="button" class="mt-3 rounded-lg border border-line px-3 py-2 text-xs font-medium text-violet-200 transition hover:border-violet-300/50">＋ Adicionar parâmetro</button>
+              </details>
+              <details class="rounded-xl border border-line bg-ink/60 p-4">
+                <summary class="cursor-pointer list-none text-sm font-semibold text-zinc-200">
+                  <span class="mr-2 text-violet-300">＋</span>Atenção &amp; experiência
+                  <span class="ml-1 text-xs font-normal text-zinc-500">· neuroestética aplicada com cautela</span>
+                </summary>
+                <p class="mt-3 max-w-3xl text-xs leading-5 text-zinc-500">Use contraste, foco, ritmo e legibilidade como ferramentas para dirigir a leitura. A resposta visual varia com contexto, cultura e pessoa — estes controles não predizem emoções nem substituem testes com o público.</p>
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-medium text-zinc-400">Ponto de entrada do olhar</span>
+                    <select id="attention-entry" class="w-full rounded-lg border border-line bg-ink px-3 py-2.5 text-sm outline-none focus:border-violet-400/60">
+                      <option value="">Deixar em aberto</option>
+                      <option>Tipografia principal</option><option>Imagem / objeto</option><option>Cor de acento</option><option>Relação entre elementos</option><option>Área de respiro</option>
+                    </select>
+                  </label>
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-medium text-zinc-400">Ritmo visual</span>
+                    <select id="attention-rhythm" class="w-full rounded-lg border border-line bg-ink px-3 py-2.5 text-sm outline-none focus:border-violet-400/60">
+                      <option value="">Deixar em aberto</option>
+                      <option>Contemplativo · pausas e espaço</option><option>Constante · repetição e cadência</option><option>Dinâmico · variação e cortes</option>
+                    </select>
+                  </label>
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-medium text-zinc-400">Intensidade de contraste</span>
+                    <select id="attention-contrast" class="w-full rounded-lg border border-line bg-ink px-3 py-2.5 text-sm outline-none focus:border-violet-400/60">
+                      <option value="">Deixar em aberto</option><option>Suave</option><option>Equilibrada</option><option>Marcada</option>
+                    </select>
+                  </label>
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-medium text-zinc-400">Densidade de informação</span>
+                    <select id="attention-density" class="w-full rounded-lg border border-line bg-ink px-3 py-2.5 text-sm outline-none focus:border-violet-400/60">
+                      <option value="">Deixar em aberto</option><option>Essencial · poucos sinais</option><option>Editorial · camadas claras</option><option>Abundante · composição densa</option>
+                    </select>
+                  </label>
+                </div>
+                <label class="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-line/70 bg-panel/60 p-3">
+                  <input id="readability-priority" type="checkbox" checked class="mt-0.5 size-4 accent-violet-300">
+                  <span><span class="block text-xs font-medium text-zinc-200">Preservar legibilidade e acesso</span><span class="mt-1 block text-[11px] leading-4 text-zinc-500">Texto e informação essenciais continuam distinguíveis; contraste expressivo não deve esconder conteúdo.</span></span>
+                </label>
+              </details>
+              <section id="relationship-map" class="hidden rounded-xl border border-violet-300/20 bg-violet-300/[.04] p-4" aria-live="polite">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-[.18em] text-violet-300">Mapa de relações</p>
+                    <p class="mt-1 text-xs text-zinc-500">Relações sugeridas: uma técnica pode ativar elementos e princípios diferentes.</p>
+                  </div>
+                  <span id="relationship-count" class="text-xs text-zinc-500"></span>
+                </div>
+                <div id="relationship-map-items" class="mt-3 space-y-2"></div>
+              </section>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="block">
+                  <span class="mb-2 block text-sm font-medium">Motor</span>
+                  <select id="clone-engine" class="w-full rounded-xl border border-line bg-ink px-4 py-3 text-sm outline-none focus:border-violet-400/60">
+                    <option value="midjourney">Midjourney Web</option>
+                    <option value="kittl">Kittl</option>
+                    <option value="flux">Flux</option>
+                  </select>
+                </label>
+                <div class="flex items-end">
+                  <p id="engine-reference-note" class="rounded-xl border border-line bg-ink/70 p-3 text-xs leading-5 text-zinc-500">A imagem de referência é enviada ao Midjourney Web. Flux e Kittl usam o prompt textual.</p>
+                </div>
+              </div>
+              <div class="sticky bottom-2 z-10 -mx-2 rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl shadow-black/30 backdrop-blur sm:mx-0 sm:p-4">
+                <p id="direction-estimate" class="mb-3 text-xs leading-5 text-zinc-400" role="status" aria-live="polite">Prévia estimada: 1 prompt. Escolha parâmetros para comparar direções.</p>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <button type="button" id="preview-direction" class="w-full rounded-xl border border-line bg-ink px-5 py-3.5 text-sm font-semibold text-zinc-200 transition hover:border-violet-300/50">1. Montar prévia</button>
+                  <button type="submit" id="clone-submit" disabled class="w-full rounded-xl bg-violet-300 px-5 py-3.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:opacity-40">2. Gerar <span id="generation-count"></span></button>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p id="preview-message" class="text-sm text-zinc-400" role="status">Monte uma prévia para revisar e editar os prompts antes de iniciar as gerações.</p>
+                <div class="flex items-center gap-3">
+                  <span id="draft-status" class="text-[11px] text-zinc-500" role="status">Rascunho local</span>
+                  <button type="button" id="reset-direction" class="text-xs text-zinc-500 underline decoration-zinc-700 underline-offset-4 transition hover:text-zinc-200">Limpar projeto</button>
+                </div>
+              </div>
+              <p id="clone-message" class="min-h-5 text-sm text-zinc-400" role="status"></p>
+            </form>
+            <section id="clone-pipeline" class="mt-6 hidden" aria-live="polite">
+              <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[.18em] text-violet-300">Fila visual</p>
+                  <h3 class="mt-1 text-sm font-semibold">Pipeline por prompt</h3>
+                </div>
+                <span id="clone-pipeline-count" class="text-xs text-zinc-500"></span>
+              </div>
+              <div id="clone-pipeline-items" class="space-y-3"></div>
+              <div id="clone-pipeline-pagination" class="mt-4 flex items-center justify-between gap-3">
+                <button id="clone-page-previous" type="button" class="rounded-lg border border-line px-3 py-2 text-xs text-zinc-300 transition hover:border-violet-300/50 disabled:opacity-40">← Anterior</button>
+                <span id="clone-page-label" class="text-xs tabular-nums text-zinc-500"></span>
+                <button id="clone-page-next" type="button" class="rounded-lg border border-line px-3 py-2 text-xs text-zinc-300 transition hover:border-violet-300/50 disabled:opacity-40">Próxima →</button>
+              </div>
+            </section>
+          </section>
+
+          <section class="tab-panel rounded-2xl border border-line bg-panel/90 p-5 sm:p-7" id="panel-explorador" role="tabpanel" aria-labelledby="tab-explorador" hidden>
+            <div class="mb-7">
+              <p class="text-xs font-semibold uppercase tracking-[.2em] text-violet-300">03 / Explorador</p>
+              <h2 class="mt-2 text-xl font-semibold">Explorador Visual</h2>
+              <p class="mt-2 max-w-xl text-sm leading-6 text-zinc-400">Explore como estética, técnicas e princípios podem ajudar a comunicar uma ideia. As sugestões são pontos de partida editáveis, não leituras definitivas.</p>
+            </div>
+            <form id="style-form" class="space-y-5">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium">Descreva o problema visual ou a intenção</span>
+                <textarea id="style-description" rows="5" maxlength="3000" required class="w-full resize-y rounded-xl border border-line bg-ink px-4 py-3 text-sm leading-6 outline-none placeholder:text-zinc-600 focus:border-violet-400/60" placeholder="Ex.: criar hierarquia num cartaz cultural usando contraste tipográfico, escala e espaço negativo…"></textarea>
+              </label>
+              <label class="block max-w-xs">
+                <span class="mb-2 block text-sm font-medium">Sugestões de prompts</span>
+                <input id="style-count" type="number" min="1" max="16" value="5" class="w-full rounded-xl border border-line bg-ink px-4 py-3 text-sm outline-none focus:border-violet-400/60">
+              </label>
+              <details class="rounded-xl border border-line bg-ink/60 p-4">
+                <summary class="cursor-pointer list-none text-sm font-semibold text-zinc-200">
+                  <span class="mr-2 text-violet-300">＋</span>Acrescentar narrativa
+                  <span class="ml-1 text-xs font-normal text-zinc-500">· opcional</span>
+                </summary>
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-medium text-zinc-400">Formato da ideia</span>
+                    <select id="explorer-format" class="w-full rounded-lg border border-line bg-ink px-3 py-2.5 text-sm outline-none focus:border-violet-400/60">
+                      <option value="">Escolher pelo brief</option><option>Imagem única</option><option>Sequência de imagens</option><option>Campanha</option><option>Storyboard</option><option>Capa ou cartaz</option>
+                    </select>
+                  </label>
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-medium text-zinc-400">Tom pretendido <span class="font-normal text-zinc-600">· não é previsão de resposta</span></span>
+                    <select id="explorer-tone" class="w-full rounded-lg border border-line bg-ink px-3 py-2.5 text-sm outline-none focus:border-violet-400/60">
+                      <option value="">Deixar aberto</option><option>Curiosidade</option><option>Contemplação</option><option>Tensão</option><option>Humor</option><option>Proximidade</option><option>Surpresa</option>
+                    </select>
+                  </label>
+                  <label class="block sm:col-span-2">
+                    <span class="mb-2 block text-xs font-medium text-zinc-400">Mudança narrativa <span class="font-normal text-zinc-600">· antes → descoberta → depois</span></span>
+                    <input id="explorer-story" type="text" class="w-full rounded-lg border border-line bg-ink px-3 py-2.5 text-sm outline-none placeholder:text-zinc-600 focus:border-violet-400/60" placeholder="O que se revela, se transforma ou permanece?">
+                  </label>
+                </div>
+              </details>
+              <button id="style-submit" type="submit" class="rounded-xl bg-violet-300 px-5 py-3.5 text-sm font-bold text-zinc-950 transition hover:bg-violet-200 disabled:opacity-60">Explorar com LLM local</button>
+              <p id="style-message" class="text-sm text-zinc-400" role="status"></p>
+              <div id="style-results" class="hidden space-y-3"></div>
+            </form>
+          </section>
+        </section>
+
+        <aside class="rounded-2xl border border-line bg-panel/90 p-5 sm:p-6 xl:sticky xl:top-6 xl:self-start" aria-label="Status em tempo real">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[.2em] text-mint">Live monitor</p>
+              <h2 class="mt-2 text-lg font-semibold">Status em Tempo Real</h2>
+            </div>
+            <span id="job-dot" class="mt-1 size-2.5 rounded-full bg-zinc-600"></span>
+          </div>
+          <div class="mt-6 rounded-xl border border-line bg-ink p-4">
+            <div class="flex items-center justify-between gap-3">
+              <span id="job-status" class="text-sm font-medium text-zinc-400">Aguardando job</span>
+              <span id="job-count" class="text-xs tabular-nums text-zinc-500">0 / 0</span>
+            </div>
+            <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+              <div id="job-progress" class="h-full w-0 rounded-full bg-violet-300 transition-all duration-500"></div>
+            </div>
+            <p id="job-current" class="mt-3 truncate text-xs text-zinc-500">Nenhuma pasta em processamento</p>
+          </div>
+          <div class="mt-5">
+            <div class="mb-3 flex items-center justify-between">
+              <h3 class="text-sm font-medium">Imagens recentes</h3>
+              <span id="image-count" class="text-xs text-zinc-500">0 arquivos</span>
+            </div>
+            <div id="thumbnails" class="grid grid-cols-2 gap-2">
+              <div class="col-span-2 rounded-xl border border-dashed border-line px-4 py-8 text-center text-xs leading-5 text-zinc-600">As imagens geradas aparecerão aqui durante o processamento.</div>
+            </div>
+          </div>
+          <div class="mt-5 border-t border-line pt-4">
+            <p class="text-xs leading-5 text-zinc-500">O painel consulta o progresso da API local e atualiza as miniaturas automaticamente.</p>
+          </div>
+        </aside>
+      </div>
+    </main>
+    <footer class="mt-10 border-t border-line pt-5 text-xs text-zinc-600">IDstudio · Interface local para o OpenMontage</footer>
+  </div>
+
+  <script>
+    const tabs = [...document.querySelectorAll("[data-tab]")];
+    tabs.forEach((tab) => tab.addEventListener("click", () => {
+      tabs.forEach((item) => {
+        const selected = item === tab;
+        item.setAttribute("aria-selected", String(selected));
+        document.getElementById(item.getAttribute("aria-controls")).hidden = !selected;
+      });
+    }));
+    tabs.forEach((tab, index) => tab.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const targetIndex = event.key === "Home" ? 0
+        : event.key === "End" ? tabs.length - 1
+          : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[targetIndex].focus();
+      tabs[targetIndex].click();
+    }));
+
+    let activeJob = null;
+    let pollTimer = null;
+    let clonePipelineItems = [];
+    let clonePipelinePage = 0;
+    let clonePipelinePageCount = 1;
+    let clonePipelineTotal = 0;
+    let clonePipelineRemoteJobId = null;
+    const clonePageSize = 10;
+    const visualChoices = {
+      aesthetics: [
+        { name: "Editorial suíço", connects: ["Tipografia", "Alinhamento", "Hierarquia"] },
+        { name: "Brutalismo", connects: ["Tipografia", "Forma e linha", "Contraste", "Ênfase"] },
+        { name: "Minimalismo", connects: ["Espaço", "Cor", "Equilíbrio", "Hierarquia"] },
+        { name: "Construtivismo", connects: ["Forma e linha", "Cor", "Repetição", "Contraste"] },
+        { name: "Modernismo orgânico", connects: ["Imagem", "Textura", "Equilíbrio"] },
+        { name: "Colagem", connects: ["Imagem", "Textura", "Sobreposição", "Contraste"] },
+        { name: "Editorial analógico", connects: ["Imagem", "Textura", "Cor", "Ênfase"] },
+        { name: "Futurismo", connects: ["Forma e linha", "Luz", "Escala", "Hierarquia"] }
+      ],
+      elements: [
+        { name: "Tipografia", hint: "Peso, escala e voz" },
+        { name: "Cor", hint: "Temperatura e contraste" },
+        { name: "Imagem", hint: "Fotografia ou ilustração" },
+        { name: "Forma e linha", hint: "Geometria e direção" },
+        { name: "Textura", hint: "Materialidade e grão" },
+        { name: "Espaço", hint: "Respiro e densidade" },
+        { name: "Luz", hint: "Foco e atmosfera" }
+      ],
+      principles: [
+        { name: "Hierarquia", hint: "Ordem de leitura" },
+        { name: "Contraste", hint: "Diferenças com intenção" },
+        { name: "Equilíbrio", hint: "Tensão e estabilidade" },
+        { name: "Alinhamento", hint: "Relação entre partes" },
+        { name: "Repetição", hint: "Ritmo e consistência" },
+        { name: "Escala", hint: "Tamanho relativo" },
+        { name: "Ênfase", hint: "Um ponto focal" }
+      ],
+      techniques: [
+        { name: "Contraste de escala", connects: ["Tipografia", "Forma e linha", "Hierarquia", "Ênfase", "Contraste"] },
+        { name: "Espaço negativo", connects: ["Espaço", "Tipografia", "Equilíbrio", "Hierarquia"] },
+        { name: "Grade quebrada", connects: ["Espaço", "Forma e linha", "Tipografia", "Alinhamento", "Repetição"] },
+        { name: "Sobreposição", connects: ["Cor", "Imagem", "Contraste", "Hierarquia"] },
+        { name: "Recorte expressivo", connects: ["Imagem", "Forma e linha", "Ênfase", "Escala"] },
+        { name: "Blocos de cor", connects: ["Cor", "Forma e linha", "Equilíbrio", "Contraste"] },
+        { name: "Repetição modular", connects: ["Forma e linha", "Tipografia", "Repetição", "Escala"] }
+      ]
+    };
+    const selectedVisualChoices = {
+      aesthetics: new Set(),
+      elements: new Set(),
+      principles: new Set(),
+      techniques: new Set()
+    };
+    let preparedDirection = null;
+    let parameterSequence = 0;
+
+    function renderChoiceButtons(group, containerId) {
+      const container = document.getElementById(containerId);
+      visualChoices[group].forEach((choice) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = group === "techniques"
+          ? "rounded-lg border border-line bg-panel/70 px-3 py-2 text-left transition hover:border-violet-300/50"
+          : "rounded-full border border-line bg-panel/70 px-3 py-2 text-left transition hover:border-violet-300/50";
+        button.setAttribute("aria-pressed", "false");
+        const name = document.createElement("span");
+        name.className = "block text-xs font-medium text-zinc-200";
+        name.textContent = choice.name;
+        button.append(name);
+        if (choice.hint) {
+          const hint = document.createElement("span");
+          hint.className = "mt-0.5 block text-[10px] text-zinc-500";
+          hint.textContent = choice.hint;
+          button.append(hint);
+        }
+        button.addEventListener("click", () => {
+          const selected = selectedVisualChoices[group];
+          if (selected.has(choice.name)) selected.delete(choice.name);
+          else selected.add(choice.name);
+          const isSelected = selected.has(choice.name);
+          button.setAttribute("aria-pressed", String(isSelected));
+          button.classList.toggle("border-violet-300/60", isSelected);
+          button.classList.toggle("bg-violet-300/10", isSelected);
+          button.classList.toggle("border-line", !isSelected);
+          invalidatePreparedDirection();
+          updateRelationshipMap();
+          updateDirectionEstimate();
+          scheduleDraftSave();
+        });
+        container.append(button);
+      });
+    }
+
+    renderChoiceButtons("elements", "visual-element-choices");
+    renderChoiceButtons("principles", "design-principle-choices");
+    renderChoiceButtons("techniques", "visual-technique-choices");
+    renderChoiceButtons("aesthetics", "visual-aesthetic-choices");
+
+    function invalidatePreparedDirection() {
+      if (!preparedDirection) return;
+      preparedDirection = null;
+      document.getElementById("clone-submit").disabled = true;
+      document.getElementById("generation-count").textContent = "";
+      document.getElementById("preview-message").textContent =
+        "As escolhas mudaram. Monte uma nova prévia para revisar antes de gerar.";
+      clonePipelineItems = [];
+      renderClonePipeline([]);
+    }
+
+    function addCustomParameterRow(name = "", values = "") {
+      parameterSequence += 1;
+      const row = document.createElement("div");
+      row.className = "grid gap-2 sm:grid-cols-[minmax(120px,.8fr)_minmax(0,2fr)_auto]";
+      const parameter = document.createElement("input");
+      parameter.type = "text";
+      parameter.value = name;
+      parameter.placeholder = "Parâmetro (ex.: paleta)";
+      parameter.setAttribute("aria-label", `Nome do parâmetro ${parameterSequence}`);
+      parameter.className = "min-w-0 rounded-lg border border-line bg-ink px-3 py-2.5 text-sm outline-none placeholder:text-zinc-600 focus:border-violet-400/60";
+      const options = document.createElement("input");
+      options.type = "text";
+      options.value = values;
+      options.placeholder = "Valores separados por vírgula (ex.: azul-cobalto, areia)";
+      options.setAttribute("aria-label", `Valores para ${name || `parâmetro ${parameterSequence}`}`);
+      options.className = "min-w-0 rounded-lg border border-line bg-ink px-3 py-2.5 text-sm outline-none placeholder:text-zinc-600 focus:border-violet-400/60";
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "rounded-lg border border-line px-3 py-2 text-sm text-zinc-400 transition hover:border-rose-300/40 hover:text-rose-200";
+      remove.setAttribute("aria-label", "Remover parâmetro");
+      remove.textContent = "×";
+      remove.addEventListener("click", () => {
+        row.remove();
+        invalidatePreparedDirection();
+        updateDirectionEstimate();
+        scheduleDraftSave();
+      });
+      row.append(parameter, options, remove);
+      document.getElementById("custom-parameter-rows").append(row);
+      parameter.addEventListener("input", invalidatePreparedDirection);
+      parameter.addEventListener("input", () => {
+        options.setAttribute("aria-label", `Valores para ${parameter.value || `parâmetro ${parameterSequence}`}`);
+      });
+      options.addEventListener("input", invalidatePreparedDirection);
+    }
+
+    document.getElementById("add-parameter").addEventListener("click", () => {
+      addCustomParameterRow();
+      invalidatePreparedDirection();
+      updateDirectionEstimate();
+      scheduleDraftSave();
+    });
+
+    const directionDraftKey = "idstudio.directionDraft.v2";
+    const directionDraftFields = [
+      "direction-subject", "direction-intention", "story-start", "story-shift",
+      "story-end", "story-audience", "custom-aesthetics", "variation-list",
+      "attention-entry", "attention-rhythm", "attention-contrast",
+      "attention-density", "readability-priority", "clone-engine",
+      "compare-elements", "compare-principles", "style-description",
+      "style-count", "explorer-format", "explorer-tone", "explorer-story"
+    ];
+
+    function saveDirectionDraft() {
+      try {
+        const draft = Object.fromEntries(directionDraftFields.map((id) => {
+          const field = document.getElementById(id);
+          return [id, field.type === "checkbox" ? field.checked : field.value];
+        }));
+        draft.selected = Object.fromEntries(Object.entries(selectedVisualChoices).map(
+          ([group, values]) => [group, [...values]]
+        ));
+        draft.parameters = [...document.querySelectorAll("#custom-parameter-rows > div")].map(
+          (row) => [...row.querySelectorAll("input")].map((input) => input.value)
+        );
+        draft.promptEdits = preparedDirection?.items.map((item) => item.prompt) || null;
+        window.localStorage.setItem(directionDraftKey, JSON.stringify(draft));
+        document.getElementById("draft-status").textContent = "Rascunho salvo neste navegador";
+      } catch {
+        document.getElementById("draft-status").textContent = "Rascunho não pôde ser salvo";
+      }
+    }
+
+    function restoreDirectionDraft() {
+      try {
+        const rawDraft = window.localStorage.getItem(directionDraftKey);
+        if (!rawDraft) return;
+        const draft = JSON.parse(rawDraft);
+        if (!draft || typeof draft !== "object") return;
+        directionDraftFields.forEach((id) => {
+          if (draft[id] === undefined) return;
+          const field = document.getElementById(id);
+          if (field.type === "checkbox") field.checked = Boolean(draft[id]);
+          else if (typeof draft[id] === "string") field.value = draft[id];
+        });
+        Object.entries(draft.selected || {}).forEach(([group, values]) => {
+          const choices = selectedVisualChoices[group];
+          if (!(choices instanceof Set) || !Array.isArray(values)) return;
+          values.forEach((value) => {
+            if (visualChoices[group]?.some((choice) => choice.name === value)) choices.add(value);
+          });
+        });
+        Object.entries(draft.selected || {}).forEach(([group, values]) => {
+          const containerId = {
+            aesthetics: "visual-aesthetic-choices",
+            elements: "visual-element-choices",
+            principles: "design-principle-choices",
+            techniques: "visual-technique-choices"
+          }[group];
+          if (!containerId || !Array.isArray(values)) return;
+          document.querySelectorAll(`#${containerId} button`).forEach((button) => {
+            const selected = values.includes(button.querySelector("span")?.textContent);
+            button.setAttribute("aria-pressed", String(selected));
+            button.classList.toggle("border-violet-300/60", selected);
+            button.classList.toggle("bg-violet-300/10", selected);
+            button.classList.toggle("border-line", !selected);
+          });
+        });
+        if (Array.isArray(draft.parameters)) {
+          draft.parameters.forEach(([name, values]) => addCustomParameterRow(name, values));
+        }
+        updateRelationshipMap();
+        if (Array.isArray(draft.promptEdits)) {
+          const restored = getClonePrompts();
+          if (draft.promptEdits.length === restored.items.length &&
+              draft.promptEdits.every((prompt) => typeof prompt === "string")) {
+            preparedDirection = restored;
+            preparedDirection.items.forEach((item, index) => {
+              item.prompt = draft.promptEdits[index];
+            });
+            renderClonePipeline(preparedDirection.items, true);
+            document.getElementById("clone-submit").disabled = false;
+            document.getElementById("generation-count").textContent =
+              `(${preparedDirection.combinationCount})`;
+            document.getElementById("preview-message").textContent =
+              "Prévia e prompts editados restaurados. Revise antes de gerar.";
+          } else {
+            preparedDirection = restored;
+            document.getElementById("clone-submit").disabled = false;
+            document.getElementById("generation-count").textContent =
+              `(${preparedDirection.combinationCount})`;
+            document.getElementById("preview-message").textContent =
+              "A prévia foi reconstruída a partir do rascunho; revise os prompts antes de gerar.";
+          }
+        }
+        document.getElementById("draft-status").textContent = "Rascunho restaurado";
+        updateDirectionEstimate();
+      } catch {
+        document.getElementById("draft-status").textContent = "Não foi possível restaurar o rascunho";
+      }
+    }
+
+    restoreDirectionDraft();
+    let draftSaveTimer;
+    const scheduleDraftSave = () => {
+      window.clearTimeout(draftSaveTimer);
+      draftSaveTimer = window.setTimeout(saveDirectionDraft, 250);
+    };
+    document.getElementById("clone-form").addEventListener("input", scheduleDraftSave);
+    document.getElementById("clone-form").addEventListener("change", scheduleDraftSave);
+    document.getElementById("style-form").addEventListener("input", scheduleDraftSave);
+    document.getElementById("style-form").addEventListener("change", scheduleDraftSave);
+
+    document.getElementById("reset-direction").addEventListener("click", () => {
+      if (!window.confirm("Limpar as escolhas e o rascunho local deste projeto?")) return;
+      window.localStorage.removeItem(directionDraftKey);
+      document.getElementById("clone-form").reset();
+      document.getElementById("style-form").reset();
+      document.getElementById("custom-parameter-rows").replaceChildren();
+      Object.values(selectedVisualChoices).forEach((values) => values.clear());
+      document.querySelectorAll("#visual-aesthetic-choices button, #visual-element-choices button, #design-principle-choices button, #visual-technique-choices button").forEach((button) => {
+        button.setAttribute("aria-pressed", "false");
+        button.classList.remove("border-violet-300/60", "bg-violet-300/10");
+        button.classList.add("border-line");
+      });
+      preparedDirection = null;
+      document.getElementById("clone-submit").disabled = true;
+      document.getElementById("generation-count").textContent = "";
+      renderClonePipeline([]);
+      updateRelationshipMap();
+      document.getElementById("variation-counter").textContent = "0 opções";
+      document.getElementById("preview-message").textContent =
+        "Monte uma prévia para revisar e editar os prompts antes de iniciar as gerações.";
+      document.getElementById("draft-status").textContent = "Rascunho limpo";
+      updateDirectionEstimate();
+    });
+
+    document.getElementById("clone-form").addEventListener("input", () => {
+      invalidatePreparedDirection();
+      updateDirectionEstimate();
+    });
+    document.getElementById("clone-form").addEventListener("change", () => {
+      invalidatePreparedDirection();
+      updateDirectionEstimate();
+    });
+
+    function updateReferenceAvailability() {
+      const supportsReference = document.getElementById("clone-engine").value === "midjourney";
+      document.getElementById("engine-reference-note").textContent = supportsReference
+        ? "A imagem de referência será enviada ao Midjourney Web."
+        : "Este motor recebe apenas o prompt textual. Se informou uma referência, limpe-a ou escolha Midjourney Web.";
+    }
+
+    document.getElementById("clone-engine").addEventListener("change", updateReferenceAvailability);
+    updateReferenceAvailability();
+
+    function updateRelationshipMap(customOperations = null) {
+      const aesthetics = visualChoices.aesthetics.filter((item) =>
+        selectedVisualChoices.aesthetics.has(item.name)
+      );
+      const customAesthetics = document.getElementById("custom-aesthetics").value
+        .split(",").map((name) => name.trim()).filter(Boolean)
+        .map((name) => ({
+          name,
+          connects: [
+            ...selectedVisualChoices.elements,
+            ...selectedVisualChoices.principles
+          ]
+        }));
+      const operations = visualChoices.techniques.filter((item) =>
+        selectedVisualChoices.techniques.has(item.name)
+      );
+      const custom = customOperations ?? document.getElementById("variation-list").value
+        .split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      const entries = [
+        ...[...aesthetics, ...customAesthetics].map((aesthetic) => ({
+          name: aesthetic.name,
+          elements: aesthetic.connects.filter((name) =>
+            visualChoices.elements.some((item) => item.name === name)
+          ),
+          principles: aesthetic.connects.filter((name) =>
+            visualChoices.principles.some((item) => item.name === name)
+          )
+        })),
+        ...operations.map((operation) => ({
+          name: operation.name,
+          elements: operation.connects.filter((name) =>
+            visualChoices.elements.some((item) => item.name === name)
+          ),
+          principles: operation.connects.filter((name) =>
+            visualChoices.principles.some((item) => item.name === name)
+          )
+        })),
+        ...custom.map((name) => ({
+          name,
+          elements: [...selectedVisualChoices.elements],
+          principles: [...selectedVisualChoices.principles],
+          aesthetics: [...selectedVisualChoices.aesthetics]
+        }))
+      ];
+      const panel = document.getElementById("relationship-map");
+      const container = document.getElementById("relationship-map-items");
+      container.replaceChildren();
+      entries.forEach((entry) => {
+        const row = document.createElement("div");
+        row.className = "grid gap-2 rounded-lg border border-line/70 bg-ink/70 p-3 sm:grid-cols-[minmax(120px,.8fr)_24px_minmax(0,2fr)] sm:items-center";
+        const operation = document.createElement("span");
+        operation.className = "text-xs font-semibold text-violet-200";
+        operation.textContent = entry.name;
+        const arrow = document.createElement("span");
+        arrow.className = "hidden text-center text-zinc-600 sm:block";
+        arrow.textContent = "→";
+        const links = document.createElement("div");
+        links.className = "flex flex-wrap gap-1.5";
+        const linkedNodes = [
+          ...(entry.aesthetics || []).map((name) => ["estética", name]),
+          ...entry.elements.map((name) => ["elemento", name]),
+          ...entry.principles.map((name) => ["princípio", name])
+        ];
+        if (!linkedNodes.length) {
+          linkedNodes.push(...[
+            ...selectedVisualChoices.aesthetics,
+            ...selectedVisualChoices.elements,
+            ...selectedVisualChoices.principles
+          ].map((name) => [selectedVisualChoices.aesthetics.has(name) ? "estética" :
+            selectedVisualChoices.elements.has(name) ? "elemento" : "princípio", name]));
+        }
+        if (!linkedNodes.length) linkedNodes.push(["brief", "intenção"]);
+        linkedNodes.forEach(([kind, name]) => {
+          const node = document.createElement("span");
+          node.className = "rounded-full border border-line px-2 py-1 text-[10px] text-zinc-400";
+          node.textContent = `${kind} · ${name}`;
+          links.append(node);
+        });
+        row.append(operation, arrow, links);
+        container.append(row);
+      });
+      panel.classList.toggle("hidden", entries.length === 0);
+      document.getElementById("relationship-count").textContent =
+        `${entries.length} ${entries.length === 1 ? "relação" : "relações"}`;
+    }
+
+    function updateDirectionEstimate() {
+      const axisCounts = [];
+      const addAxisCount = (values) => {
+        const count = new Set(values.map((value) => value.trim()).filter(Boolean)).size;
+        if (count) axisCounts.push(count);
+      };
+      addAxisCount([
+        ...selectedVisualChoices.aesthetics,
+        ...document.getElementById("custom-aesthetics").value.split(",")
+      ]);
+      if (document.getElementById("compare-elements").checked) {
+        addAxisCount([...selectedVisualChoices.elements]);
+      }
+      if (document.getElementById("compare-principles").checked) {
+        addAxisCount([...selectedVisualChoices.principles]);
+      }
+      addAxisCount([...selectedVisualChoices.techniques]);
+      addAxisCount(document.getElementById("variation-list").value.split(/\r?\n/));
+      document.querySelectorAll("#custom-parameter-rows > div").forEach((row) => {
+        const [nameInput, valuesInput] = row.querySelectorAll("input");
+        if (nameInput.value.trim()) addAxisCount(valuesInput.value.split(","));
+      });
+
+      const total = axisCounts.reduce((count, axisCount) => count * axisCount, 1);
+      const estimate = document.getElementById("direction-estimate");
+      if (total > 1001) {
+        estimate.textContent =
+          `Combinação acima do limite: ${total.toLocaleString("pt-BR")} prompts. Reduza as opções para até 1.001.`;
+        estimate.className = "mb-3 text-xs leading-5 text-rose-300";
+      } else {
+        const breakdown = axisCounts.length
+          ? ` · produto dos eixos: ${axisCounts.join(" × ")}`
+          : "";
+        estimate.textContent = axisCounts.length
+          ? `Prévia estimada: ${total.toLocaleString("pt-BR")} ${total === 1 ? "prompt" : "prompts"}${breakdown}. A combinação será revisada antes de gerar.`
+          : "Prévia estimada: 1 prompt. Escolha parâmetros para comparar direções.";
+        estimate.className = "mb-3 text-xs leading-5 text-zinc-400";
+      }
+    }
+
+    function renderClonePipeline(items, resetPage = false, remotePage = null) {
+      clonePipelineItems = items;
+      if (resetPage) clonePipelinePage = 0;
+      const pipeline = document.getElementById("clone-pipeline");
+      const container = document.getElementById("clone-pipeline-items");
+      const totalPages = remotePage
+        ? Math.max(1, Math.ceil(remotePage.total / remotePage.pageSize))
+        : Math.max(1, Math.ceil(items.length / clonePageSize));
+      clonePipelinePage = remotePage
+        ? remotePage.page - 1
+        : Math.min(clonePipelinePage, totalPages - 1);
+      clonePipelinePageCount = totalPages;
+      clonePipelineTotal = remotePage?.total ?? items.length;
+      if (remotePage) clonePipelineRemoteJobId = remotePage.jobId;
+      else clonePipelineRemoteJobId = null;
+      const visibleItems = remotePage ? items : items.slice(
+        clonePipelinePage * clonePageSize,
+        (clonePipelinePage + 1) * clonePageSize
+      );
+      const statusCopy = {
+        ready: ["Prévia", "text-zinc-300"],
+        queued: ["Na fila", "text-amber-200"],
+        running: ["Gerando", "text-violet-200"],
+        completed: ["Concluído", "text-mint"],
+        failed: ["Falhou", "text-rose-300"]
+      };
+      container.replaceChildren();
+      visibleItems.forEach((item) => {
+        const [label, tone] = statusCopy[item.status] || ["Na fila", "text-zinc-300"];
+        const card = document.createElement("article");
+        card.className = "overflow-hidden rounded-xl border border-line bg-ink";
+        const body = document.createElement("div");
+        body.className = "grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_112px]";
+        const content = document.createElement("div");
+        content.className = "min-w-0";
+        const heading = document.createElement("div");
+        heading.className = "flex flex-wrap items-center justify-between gap-2";
+        const title = document.createElement("p");
+        title.className = "text-sm font-semibold";
+        title.textContent = `${String(item.index).padStart(3, "0")} · ${item.variacao || item.estetica}`;
+        const badge = document.createElement("span");
+        badge.className = `rounded-full border border-line bg-panel px-2.5 py-1 text-[11px] font-medium ${tone}`;
+        badge.textContent = label;
+        heading.append(title, badge);
+        const prompt = document.createElement(item.status === "ready" ? "textarea" : "p");
+        prompt.className = "mt-3 min-h-24 w-full resize-y whitespace-pre-wrap break-words rounded-lg border border-line/70 bg-panel/70 p-3 font-mono text-xs leading-5 text-zinc-400";
+        if (item.status === "ready") {
+          prompt.setAttribute("aria-label", `Prompt ${item.index}, editável`);
+          prompt.value = item.prompt;
+          prompt.addEventListener("input", () => {
+            item.prompt = prompt.value;
+            if (preparedDirection?.items[item.index - 1]) {
+              preparedDirection.items[item.index - 1].prompt = prompt.value;
+            }
+            scheduleDraftSave();
+          });
+        } else {
+          prompt.textContent = item.prompt;
+        }
+        const steps = document.createElement("ol");
+        steps.className = "mt-3 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wider";
+        const stepStates = item.status === "completed"
+          ? ["done", "done", "done"]
+          : item.status === "failed"
+            ? ["done", "failed", "pending"]
+            : item.status === "running"
+              ? ["done", "active", "pending"]
+              : item.status === "queued"
+                ? ["done", "active", "pending"]
+                : ["active", "pending", "pending"];
+        ["Texto", item.motor || document.getElementById("clone-engine").value, "Imagem"].forEach((name, index) => {
+          if (index) {
+            const connector = document.createElement("li");
+            connector.className = "list-none text-zinc-700";
+            connector.setAttribute("aria-hidden", "true");
+            connector.textContent = "→";
+            steps.append(connector);
+          }
+          const step = document.createElement("li");
+          const stateTone = stepStates[index] === "done" ? "text-mint" :
+            stepStates[index] === "active" ? "text-violet-200" :
+              stepStates[index] === "failed" ? "text-rose-300" : "text-zinc-600";
+          step.className = stateTone;
+          step.textContent = `${stepStates[index] === "done" ? "✓ " : stepStates[index] === "failed" ? "× " : "○ "}${name}`;
+          steps.append(step);
+        });
+        const actions = document.createElement("div");
+        actions.className = "mt-3 flex flex-wrap items-center gap-3";
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.className = "text-xs font-medium text-violet-300 transition hover:text-violet-200";
+        copy.textContent = "Copiar prompt";
+        copy.addEventListener("click", async () => {
+          try {
+              await navigator.clipboard.writeText(item.prompt);
+            copy.textContent = "Copiado ✓";
+            window.setTimeout(() => { copy.textContent = "Copiar prompt"; }, 1400);
+          } catch {
+            copy.textContent = "Cópia indisponível";
+          }
+        });
+        actions.append(copy);
+        if (item.error) {
+          const error = document.createElement("span");
+          error.className = "text-xs text-rose-300";
+          error.textContent = item.error;
+          actions.append(error);
+        }
+        content.append(heading, prompt, steps, actions);
+        body.append(content);
+        if (item.thumbnail) {
+          const image = document.createElement("img");
+          image.src = item.thumbnail;
+          image.alt = `Resultado para ${item.variacao || item.estetica}`;
+          image.loading = "lazy";
+          image.className = "aspect-square w-full rounded-lg border border-line bg-panel object-cover";
+          body.append(image);
+        }
+        card.append(body);
+        container.append(card);
+      });
+      pipeline.classList.toggle("hidden", items.length === 0);
+      document.getElementById("clone-pipeline-count").textContent =
+        `${clonePipelineTotal} ${clonePipelineTotal === 1 ? "prompt" : "prompts"}`;
+      document.getElementById("clone-page-label").textContent =
+        `${clonePipelinePage + 1} / ${totalPages}`;
+      document.getElementById("clone-page-previous").disabled = clonePipelinePage === 0;
+      document.getElementById("clone-page-next").disabled = clonePipelinePage >= totalPages - 1;
+    }
+
+    async function changeClonePipelinePage(direction) {
+      const page = Math.max(0, Math.min(
+        clonePipelinePageCount - 1,
+        clonePipelinePage + direction
+      ));
+      if (page === clonePipelinePage) return;
+      if (clonePipelineRemoteJobId) {
+        const jobId = clonePipelineRemoteJobId;
+        try {
+          const response = await fetch(
+            `/progresso/${encodeURIComponent(jobId)}?page=${page + 1}&page_size=${clonePageSize}`
+          );
+          const detail = await response.json();
+          if (!response.ok) throw new Error(detail.detail || "Não foi possível carregar esta página.");
+          renderClonePipeline(detail.items, false, {
+            jobId,
+            page: detail.items_page,
+            pageSize: detail.items_page_size,
+            total: detail.items_total
+          });
+        } catch (error) {
+          document.getElementById("clone-message").textContent = error.message;
+        }
+      } else {
+        clonePipelinePage = page;
+        renderClonePipeline(clonePipelineItems);
+      }
+    }
+
+    document.getElementById("clone-page-previous").addEventListener("click", () => {
+      changeClonePipelinePage(-1);
+    });
+
+    document.getElementById("clone-page-next").addEventListener("click", () => {
+      changeClonePipelinePage(1);
+    });
+
+    document.getElementById("variation-list").addEventListener("input", (event) => {
+      const count = event.currentTarget.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).length;
+      const counter = document.getElementById("variation-counter");
+      counter.textContent = `${count} / 1001`;
+      counter.className = `shrink-0 text-xs tabular-nums ${count > 1001 ? "text-rose-300" : "text-zinc-500"}`;
+      updateRelationshipMap();
+    });
+    document.getElementById("custom-aesthetics").addEventListener("input", () => {
+      updateRelationshipMap();
+    });
+
+    function setJobStatus(status, detail) {
+      const label = {
+        queued: "Na fila",
+        running: "Em andamento",
+        completed: "Concluído",
+        completed_with_errors: "Concluído com falhas",
+        failed: "Falhou"
+      }[status] || status;
+      document.getElementById("job-status").textContent = label;
+      document.getElementById("job-dot").className = "mt-1 size-2.5 rounded-full " +
+        (status === "completed" ? "bg-mint" : status === "failed" || status === "completed_with_errors" ? "bg-rose-400" : "bg-violet-300");
+      document.getElementById("job-current").textContent =
+        detail?.error || (detail?.current_folder
+          ? `${detail.items ? "Variação" : "Pasta"} atual: ${detail.current_folder}`
+          : "Nenhuma tarefa em processamento");
+      const total = Number(detail?.total || 0);
+      const completed = Number(detail?.completed || 0);
+      document.getElementById("job-count").textContent = `${completed} / ${total}`;
+      document.getElementById("job-progress").style.width = `${total ? Math.min(100, completed / total * 100) : status === "completed" ? 100 : 0}%`;
+      if (Array.isArray(detail?.items)) {
+        renderClonePipeline(detail.items, false, {
+          jobId: detail.job_id,
+          page: detail.items_page || 1,
+          pageSize: detail.items_page_size || clonePageSize,
+          total: detail.items_total ?? detail.items.length
+        });
+      }
+      if (Array.isArray(detail?.thumbnails)) {
+        const container = document.getElementById("thumbnails");
+        container.replaceChildren();
+        detail.thumbnails.forEach((url) => {
+          const image = document.createElement("img");
+          image.src = url;
+          image.alt = "Miniatura gerada";
+          image.loading = "lazy";
+          image.className = "aspect-square w-full rounded-lg border border-line bg-zinc-900 object-cover";
+          container.append(image);
+        });
+        if (!detail.thumbnails.length) {
+          container.innerHTML = '<div class="col-span-2 rounded-xl border border-dashed border-line px-4 py-8 text-center text-xs text-zinc-600">Aguardando imagens geradas…</div>';
+        }
+        document.getElementById("image-count").textContent = `${detail.thumbnails.length} arquivos`;
+      }
+    }
+
+    async function pollProgress(jobId, onFinish = () => {}) {
+      try {
+        const page = clonePipelineRemoteJobId === jobId ? clonePipelinePage + 1 : 1;
+        const response = await fetch(
+          `/progresso/${encodeURIComponent(jobId)}?page=${page}&page_size=${clonePageSize}`
+        );
+        const detail = await response.json();
+        if (!response.ok) throw new Error(detail.detail || "Não foi possível consultar o job.");
+        setJobStatus(detail.status, detail);
+        if (["queued", "running"].includes(detail.status)) {
+          pollTimer = window.setTimeout(() => pollProgress(jobId, onFinish), 1800);
+        } else {
+          activeJob = null;
+          document.getElementById("curation-form").querySelector("button[type=submit]").disabled = false;
+          onFinish();
+        }
+      } catch (error) {
+        document.getElementById("curation-message").textContent = error.message;
+        activeJob = null;
+        document.getElementById("curation-form").querySelector("button[type=submit]").disabled = false;
+        onFinish(error);
+      }
+    }
+
+    document.getElementById("curation-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = event.currentTarget.querySelector("button[type=submit]");
+      const message = document.getElementById("curation-message");
+      if (activeJob) return;
+      button.disabled = true;
+      message.textContent = "Enviando solicitação…";
+      try {
+        const payload = {
+          criterio: document.getElementById("curation-criterion").value,
+          pasta_raiz: document.getElementById("folder-path").value.trim() || null,
+          meta_imagens: Number(document.getElementById("image-target").value),
+          reference_url: document.getElementById("reference-url").value.trim() || null
+        };
+        const response = await fetch("/iniciar-curadoria", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Falha ao iniciar a curadoria.");
+        activeJob = result.job_id;
+        clonePipelineRemoteJobId = null;
+        message.textContent = `Job ${result.job_id} iniciado.`;
+        setJobStatus(result.status, result);
+        pollProgress(activeJob);
+      } catch (error) {
+        button.disabled = false;
+        message.textContent = error.message;
+      }
+    });
+
+    function getClonePrompts() {
+      const subject = document.getElementById("direction-subject").value.trim();
+      const intention = document.getElementById("direction-intention").value.trim();
+      const storyStart = document.getElementById("story-start").value.trim();
+      const storyShift = document.getElementById("story-shift").value.trim();
+      const storyEnd = document.getElementById("story-end").value.trim();
+      const storyAudience = document.getElementById("story-audience").value.trim();
+      const attentionEntry = document.getElementById("attention-entry").value;
+      const attentionRhythm = document.getElementById("attention-rhythm").value;
+      const attentionContrast = document.getElementById("attention-contrast").value;
+      const attentionDensity = document.getElementById("attention-density").value;
+      const readability = document.getElementById("readability-priority").checked;
+      if (!subject) throw new Error("Descreva a peça ou o assunto do projeto.");
+      const axes = [];
+      const addAxis = (name, values) => {
+        const uniqueValues = [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+        if (uniqueValues.length) {
+          if (axes.some((axis) => axis.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+            throw new Error(`O parâmetro “${name}” foi adicionado mais de uma vez.`);
+          }
+          axes.push({ name, values: uniqueValues });
+        }
+      };
+      addAxis("Estética", [
+        ...selectedVisualChoices.aesthetics,
+        ...document.getElementById("custom-aesthetics").value.split(",")
+      ]);
+      const elements = [...selectedVisualChoices.elements];
+      const principles = [...selectedVisualChoices.principles];
+      if (document.getElementById("compare-elements").checked) {
+        addAxis("Elemento visual", elements);
+      }
+      if (document.getElementById("compare-principles").checked) {
+        addAxis("Princípio de design", principles);
+      }
+      addAxis("Técnica visual", [...selectedVisualChoices.techniques]);
+      const customOperations = document.getElementById("variation-list").value
+        .split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      addAxis("Operação personalizada", customOperations);
+
+      document.querySelectorAll("#custom-parameter-rows > div").forEach((row, index) => {
+        const [nameInput, valuesInput] = row.querySelectorAll("input");
+        const name = nameInput.value.trim();
+        const values = valuesInput.value.split(",").map((value) => value.trim()).filter(Boolean);
+        if (name && !values.length) {
+          throw new Error(`Adicione pelo menos um valor para o parâmetro "${name}".`);
+        }
+        if (!name && values.length) {
+          throw new Error(`Informe o nome do parâmetro personalizado ${index + 1}.`);
+        }
+        if (name && values.length) addAxis(name, values);
+      });
+
+      if (!axes.length) addAxis("Direção visual", ["Exploração livre"]);
+      const combinationCount = axes.reduce((count, axis) => count * axis.values.length, 1);
+      if (combinationCount > 1001) {
+        throw new Error(`Esta combinação criaria ${combinationCount.toLocaleString("pt-BR")} prompts. Reduza as opções para até 1001.`);
+      }
+
+      let combinations = [{}];
+      axes.forEach((axis) => {
+        combinations = combinations.flatMap((combination) =>
+          axis.values.map((value) => ({ ...combination, [axis.name]: value }))
+        );
+      });
+      const template = [
+        `Crie uma peça de design para: ${subject}.`,
+        intention ? `Intenção de comunicação: ${intention}.` : "",
+        storyAudience ? `Público e contexto: ${storyAudience}.` : "",
+        storyStart ? `Narrativa visual — ponto de partida: ${storyStart}.` : "",
+        storyShift ? `Narrativa visual — virada ou descoberta: ${storyShift}.` : "",
+        storyEnd ? `Narrativa visual — o que fica depois: ${storyEnd}.` : "",
+        elements.length && !document.getElementById("compare-elements").checked ? `Elementos que podem combinar na mesma direção: ${elements.join(", ")}.` : "",
+        principles.length && !document.getElementById("compare-principles").checked ? `Princípios para organizar a composição: ${principles.join(", ")}.` : "",
+        "Use as escolhas a seguir como parâmetros da direção de arte. Preserve a intenção do brief e faça as decisões visuais trabalharem em conjunto.",
+        attentionEntry ? `Ponto de entrada do olhar: ${attentionEntry}.` : "",
+        attentionRhythm ? `Ritmo visual: ${attentionRhythm}.` : "",
+        attentionContrast ? `Intensidade de contraste: ${attentionContrast}.` : "",
+        attentionDensity ? `Densidade de informação: ${attentionDensity}.` : "",
+        readability ? "Mantenha textos e informações essenciais legíveis e acessíveis." : "",
+        "Trate estas escolhas como hipóteses visuais a explorar; não assuma que um recurso produz a mesma resposta em todo público.",
+        "{variavel}",
+        "Entregue uma composição visual clara, intencional e adequada ao assunto."
+      ].filter(Boolean).join("\n");
+      const variations = combinations.map((combination) =>
+        Object.entries(combination).map(([name, value]) => `${name}: ${value}`).join(" · ")
+      );
+      updateRelationshipMap(customOperations);
+      const items = variations.map((variacao, index) => ({
+        index: index + 1,
+        variacao,
+        prompt: template.replaceAll("{variavel}", variacao),
+        motor: document.getElementById("clone-engine").value,
+        status: "ready"
+      }));
+      renderClonePipeline(items, true);
+      return {
+        template,
+        variations,
+        items,
+        combinationCount,
+        axes
+      };
+    }
+
+    document.getElementById("preview-direction").addEventListener("click", () => {
+      try {
+        preparedDirection = getClonePrompts();
+        document.getElementById("clone-submit").disabled = false;
+        document.getElementById("generation-count").textContent =
+          `(${preparedDirection.combinationCount})`;
+        document.getElementById("preview-message").textContent =
+          `Prévia pronta: ${preparedDirection.combinationCount} ${preparedDirection.combinationCount === 1 ? "prompt" : "prompts"} em ${preparedDirection.axes.length} ${preparedDirection.axes.length === 1 ? "eixo" : "eixos"} combinados. Revise abaixo antes de gerar.`;
+        document.getElementById("clone-message").textContent = "";
+      } catch (error) {
+        preparedDirection = null;
+        document.getElementById("clone-submit").disabled = true;
+        document.getElementById("preview-message").textContent = error.message;
+      }
+    });
+
+    document.getElementById("clone-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = document.getElementById("clone-submit");
+      const message = document.getElementById("clone-message");
+      if (activeJob) return;
+      button.disabled = true;
+      try {
+        if (!preparedDirection) {
+          throw new Error("Monte e revise a prévia antes de iniciar as gerações.");
+        }
+        const { template, variations } = preparedDirection;
+        const file = document.getElementById("base-image").files[0];
+        const imagePath = document.getElementById("base-image-path").value.trim();
+        const engine = document.getElementById("clone-engine").value;
+        if (file && imagePath) throw new Error("Escolha o upload ou o caminho da imagem, não os dois.");
+        if (engine !== "midjourney" && (file || imagePath)) {
+          throw new Error("A imagem de referência só é aceita pelo Midjourney Web. Remova a referência ou escolha esse motor.");
+        }
+        if (file && file.size > 20 * 1024 * 1024) throw new Error("A imagem deve ter até 20 MiB.");
+        const imageData = file ? await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error("Não foi possível ler a imagem selecionada."));
+          reader.readAsDataURL(file);
+        }) : null;
+        const response = await fetch("/iniciar-direcao", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt_template: template,
+            variacoes: variations,
+            prompts: preparedDirection.items.map((item) => item.prompt),
+            motor: engine,
+            image_path: imagePath || null,
+            image_data: imageData
+          })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Falha ao iniciar a geração.");
+        activeJob = result.job_id;
+        clonePipelineRemoteJobId = result.job_id;
+        message.textContent = `Job ${result.job_id} iniciado · ${variations.length} variações na fila.`;
+        setJobStatus(result.status, result);
+        pollProgress(activeJob, (error) => {
+          button.disabled = false;
+          if (error) message.textContent = error.message;
+        });
+      } catch (error) {
+        button.disabled = !preparedDirection;
+        message.textContent = error.message;
+      }
+    });
+
+    document.getElementById("style-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = document.getElementById("style-submit");
+      const message = document.getElementById("style-message");
+      const results = document.getElementById("style-results");
+      button.disabled = true;
+      message.textContent = "Consultando o LLM local…";
+      results.classList.add("hidden");
+      try {
+        const briefParts = [
+          document.getElementById("style-description").value.trim(),
+          document.getElementById("explorer-format").value
+            ? `Formato narrativo: ${document.getElementById("explorer-format").value}.` : "",
+          document.getElementById("explorer-tone").value
+            ? `Tom pretendido (hipótese, não resultado garantido): ${document.getElementById("explorer-tone").value}.` : "",
+          document.getElementById("explorer-story").value.trim()
+            ? `Transformação narrativa: ${document.getElementById("explorer-story").value.trim()}.` : "",
+          "Sugira direções visuais por meio de escolhas observáveis de composição, hierarquia, ritmo, contraste e metáfora visual. Explique como cada técnica pode apoiar a narrativa; não afirme que causa uma resposta neuropsicológica universal."
+        ].filter(Boolean).join("\n");
+        const response = await fetch("/explorar-direcao", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            brief: briefParts,
+            quantidade: Number(document.getElementById("style-count").value)
+          })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Falha ao explorar a direção visual.");
+        results.replaceChildren();
+        result.prompts.forEach((prompt, index) => {
+          const card = document.createElement("article");
+          card.className = "rounded-xl border border-line bg-ink p-4";
+          const title = document.createElement("p");
+          title.className = "mb-2 text-xs font-semibold uppercase tracking-widest text-violet-300";
+          title.textContent = `Sugestão ${String(index + 1).padStart(2, "0")}`;
+          const text = document.createElement("p");
+          text.className = "text-sm leading-6 text-zinc-300";
+          text.textContent = prompt;
+          const useDirection = document.createElement("button");
+          useDirection.type = "button";
+          useDirection.className = "mt-3 rounded-lg border border-line px-3 py-2 text-xs font-medium text-violet-200 transition hover:border-violet-300/50";
+          useDirection.textContent = "Levar para a Mesa de Direção";
+          useDirection.addEventListener("click", () => {
+            document.getElementById("direction-intention").value = prompt;
+            invalidatePreparedDirection();
+            saveDirectionDraft();
+            document.getElementById("tab-clonagem").click();
+            document.getElementById("direction-subject").focus();
+            document.getElementById("preview-message").textContent =
+              "Direção explorada. Defina o assunto, escolha parâmetros e monte uma prévia.";
+          });
+          card.append(title, text, useDirection);
+          results.append(card);
+        });
+        results.classList.remove("hidden");
+        message.textContent = "Sugestões geradas pelo modelo local.";
+      } catch (error) {
+        message.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

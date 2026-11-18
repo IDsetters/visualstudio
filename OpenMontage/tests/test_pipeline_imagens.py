@@ -345,7 +345,11 @@ def test_pipeline_routes_midjourney_through_style_explorer_and_web(
     reference = tmp_path / "reference.png"
     reference.write_bytes(b"reference")
     monkeypatch.setenv("IMAGE_GENERATION_PROVIDER", "midjourney")
-    monkeypatch.setattr(pipeline_imagens, "expandir_estetica_midjourney", fake_expand)
+    monkeypatch.setattr(
+        pipeline_imagens,
+        "expandir_direcao_visual_midjourney",
+        fake_expand,
+    )
     monkeypatch.setattr(pipeline_imagens, "gerar_midjourney_web", fake_midjourney)
 
     result = asyncio.run(
@@ -587,7 +591,7 @@ def test_checkpoint_is_written_after_successful_notion_publish(
     monkeypatch.setenv("NOTION_TOKEN", "test-token")
     monkeypatch.setenv("NOTION_DATABASE_ID", "database-id")
 
-    async def select_one(paths, _criterion):
+    async def select_one(paths, _criterion, _target_count):
         return [pipeline_imagens.ImageAsset("img_0001", paths[0])]
 
     async def no_generated_images(
@@ -629,6 +633,8 @@ def test_checkpoint_is_written_after_successful_notion_publish(
 def test_api_job_exposes_batch_progress(monkeypatch, tmp_path: Path) -> None:
     async def fake_batch(**kwargs):
         assert kwargs["reference_url"] == "https://images.example/reference.png"
+        assert kwargs["root"] == local_root
+        assert kwargs["target_count"] == 9
         await kwargs["progress_callback"](
             {
                 "total": 1,
@@ -650,8 +656,10 @@ def test_api_job_exposes_batch_progress(monkeypatch, tmp_path: Path) -> None:
         }
 
     local_root = tmp_path / "assets_teste"
+    local_root.mkdir()
     monkeypatch.setattr(pipeline_imagens, "DEFAULT_INPUT_DIR", local_root)
     monkeypatch.setattr(pipeline_imagens, "processar_pastas_locais", fake_batch)
+    monkeypatch.setenv("IDSTUDIO_AUTO_OPEN_BROWSER", "false")
 
     with TestClient(pipeline_imagens.app) as client:
         start = client.post(
@@ -659,6 +667,8 @@ def test_api_job_exposes_batch_progress(monkeypatch, tmp_path: Path) -> None:
             json={
                 "criterio": "editorial",
                 "reference_url": "https://images.example/reference.png",
+                "pasta_raiz": str(local_root),
+                "meta_imagens": 9,
             },
         )
         assert start.status_code == 202
@@ -674,3 +684,154 @@ def test_api_job_exposes_batch_progress(monkeypatch, tmp_path: Path) -> None:
         "/progresso/{job_id}",
     }
     del pipeline_imagens.curation_jobs[job_id]
+
+
+def test_idstudio_root_serves_static_panel_and_opens_browser(monkeypatch) -> None:
+    opened_urls = []
+    monkeypatch.delenv("IDSTUDIO_AUTO_OPEN_BROWSER", raising=False)
+    monkeypatch.setattr(pipeline_imagens.webbrowser, "open", opened_urls.append)
+
+    with TestClient(pipeline_imagens.app) as client:
+        response = client.get("/")
+
+    assert response.status_code == 200
+    assert "IDstudio — Painel de Direção de Arte &amp; Automação" in response.text
+    assert opened_urls == ["http://127.0.0.1:8000"]
+
+
+def test_visual_explorer_endpoint_uses_local_prompt_expander(monkeypatch) -> None:
+    async def fake_expand(style: str, quantidade: int) -> list[str]:
+        assert style == "Hierarquia e espaço negativo"
+        assert quantidade == 2
+        return ["Prompt A --stylize 100 --ar 3:2", "Prompt B --stylize 200 --ar 4:3"]
+
+    monkeypatch.setattr(
+        pipeline_imagens,
+        "expandir_direcao_visual_midjourney",
+        fake_expand,
+    )
+    monkeypatch.setenv("IDSTUDIO_AUTO_OPEN_BROWSER", "false")
+
+    with TestClient(pipeline_imagens.app) as client:
+        response = client.post(
+            "/explorar-direcao",
+            json={"brief": " Hierarquia e espaço negativo ", "quantidade": 2},
+        )
+        legacy_response = client.post(
+            "/explorar-estetica",
+            json={"estetica": " Hierarquia e espaço negativo ", "quantidade": 2},
+        )
+
+    assert response.status_code == 200
+    assert len(response.json()["prompts"]) == 2
+    assert legacy_response.status_code == 200
+
+
+def test_clone_endpoint_runs_each_visual_variation_and_returns_thumbnails(
+    monkeypatch, tmp_path: Path
+) -> None:
+    output_dir = tmp_path / "output"
+    monkeypatch.setattr(pipeline_imagens, "OUTPUT_DIR", output_dir)
+    monkeypatch.setenv("IDSTUDIO_AUTO_OPEN_BROWSER", "false")
+
+    async def fake_flux(prompt: str, destination: Path) -> Path:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (20, 20), "purple").save(destination)
+        assert prompt.startswith("Director-edited: ")
+        return destination
+
+    monkeypatch.setattr(pipeline_imagens, "gerar_flux", fake_flux)
+
+    with TestClient(pipeline_imagens.app) as client:
+        response = client.post(
+            "/iniciar-direcao",
+            json={
+                "prompt_template": "Book cover, {variavel}",
+                "variacoes": ["Contraste de escala", "Espaço negativo"],
+                "prompts": [
+                    "Director-edited: bold scale and restrained typography",
+                    "Director-edited: generous negative space and fine texture",
+                ],
+                "motor": "flux",
+            },
+        )
+
+    assert response.status_code == 202
+    job = pipeline_imagens.curation_jobs[response.json()["job_id"]]
+    assert job["status"] == "completed"
+    assert job["processed"] == 2
+    assert len(job["thumbnails"]) == 2
+    assert [item["status"] for item in job["items"]] == ["completed", "completed"]
+    assert job["items"][0]["prompt"] == "Director-edited: bold scale and restrained typography"
+    assert job["items"][0]["thumbnail"] == job["thumbnails"][0]
+    del pipeline_imagens.curation_jobs[response.json()["job_id"]]
+
+
+def test_clone_request_keeps_legacy_aesthetic_field_compatible() -> None:
+    request = pipeline_imagens.ClonagemRequest(
+        prompt_template="Arte {variavel}",
+        esteticas=["hierarquia", "contraste"],
+        motor="flux",
+    )
+
+    assert request.variacoes == ["hierarquia", "contraste"]
+
+
+def test_clone_endpoint_rejects_prompt_count_mismatch(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(pipeline_imagens, "OUTPUT_DIR", tmp_path / "output")
+    monkeypatch.setenv("IDSTUDIO_AUTO_OPEN_BROWSER", "false")
+
+    with TestClient(pipeline_imagens.app) as client:
+        response = client.post(
+            "/iniciar-direcao",
+            json={
+                "prompt_template": "Arte {variavel}",
+                "variacoes": ["Estética", "Contraste"],
+                "prompts": ["Um único prompt editado"],
+                "motor": "flux",
+            },
+        )
+
+    assert response.status_code == 422
+
+
+def test_progress_endpoint_paginates_prompt_details_without_mutating_job(
+    monkeypatch,
+) -> None:
+    job_id = "pagination-test"
+    items = [
+        {"index": index, "variacao": f"Operação {index}", "prompt": f"Prompt {index}"}
+        for index in range(1, 26)
+    ]
+    monkeypatch.setitem(
+        pipeline_imagens.curation_jobs,
+        job_id,
+        {
+            "job_id": job_id,
+            "status": "running",
+            "total": len(items),
+            "completed": 12,
+            "items": items,
+        },
+    )
+    monkeypatch.setenv("IDSTUDIO_AUTO_OPEN_BROWSER", "false")
+
+    with TestClient(pipeline_imagens.app) as client:
+        response = client.get(f"/progresso/{job_id}?page=2&page_size=10")
+
+    assert response.status_code == 200
+    progress = response.json()
+    assert progress["items_total"] == 25
+    assert progress["items_page"] == 2
+    assert [item["index"] for item in progress["items"]] == list(range(11, 21))
+    assert len(pipeline_imagens.curation_jobs[job_id]["items"]) == 25
+
+
+@pytest.mark.parametrize("query", ["page=0", "page_size=51"])
+def test_progress_endpoint_rejects_invalid_pagination(query: str, monkeypatch) -> None:
+    monkeypatch.setenv("IDSTUDIO_AUTO_OPEN_BROWSER", "false")
+
+    with TestClient(pipeline_imagens.app) as client:
+        response = client.get(f"/progresso/unknown?{query}")
+
+    assert response.status_code == 422

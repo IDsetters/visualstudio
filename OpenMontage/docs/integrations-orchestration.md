@@ -119,6 +119,33 @@ python pipeline_imagens.py --todas-pastas-locais
 uvicorn pipeline_imagens:app --host 127.0.0.1 --port 8000
 ```
 
+The local API serves the IDstudio dark-mode panel at `http://127.0.0.1:8000/`
+and opens it in the default browser at startup. Set `IDSTUDIO_URL` when using a
+different host or port, or set `IDSTUDIO_AUTO_OPEN_BROWSER=false` to disable
+automatic browser opening. The panel submits local-folder curation jobs,
+polls `/progresso/{job_id}` for live status and generated thumbnails, and uses
+`/explorar-direcao` to request Midjourney prompt variations from the local
+OpenAI-compatible LLM configured with `LLM_BASE_URL` and `LLM_MODEL`. The art
+direction workspace composes a brief from design elements, principles, and
+visual techniques, includes aesthetics as one selectable visual axis, and
+supports story arcs, audience/context, perceptual direction (attention entry,
+rhythm, contrast and information density), accessibility intent, and custom
+parameters such as palette, era, or material. These are creative hypotheses,
+not universal neuropsychological predictions. Its preview computes Cartesian
+combinations (up to 1001) before generation, allows prompt editing, shows
+suggested technique-to-element/principle relationships, and provides a
+paginated, per-prompt generation pipeline. Creative drafts are stored in the
+browser's local storage; uploaded files and image paths are not saved.
+`/iniciar-direcao` accepts generic `variacoes` and optional edited `prompts`;
+`/iniciar-clonagem` and the `esteticas` request field remain as compatibility
+aliases. Local image paths entered in the panel must be accessible to the
+machine running the API.
+Midjourney Web accepts the selected image as a visual reference, while Flux
+and Kittl currently generate from prompt text only. Image uploads are limited
+to 20 MiB. Progress responses paginate prompt items with `page` (1-based,
+default `1`) and `page_size` (default `10`, maximum `50`); `items_total`,
+`items_page`, and `items_page_size` describe the returned slice.
+
 The API starts a local batch with `POST /iniciar-curadoria` and returns a job
 ID; poll `GET /progresso/{job_id}` for counts, the current folder, and errors:
 
