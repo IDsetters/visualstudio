@@ -13,6 +13,7 @@ import pytest
 
 from generators import flux as flux_generator
 from generators import kittl_automation
+from generators import midjourney_web
 import pipeline_imagens
 
 
@@ -177,6 +178,191 @@ def test_flux_adapter_uses_direct_bfl_when_fal_is_not_configured(
     )
 
     assert result.read_bytes() == b"bfl-image"
+
+
+def test_local_llm_expands_midjourney_style_parameters(monkeypatch) -> None:
+    class FakeClient:
+        def __init__(self, **kwargs) -> None:
+            self.configuration = kwargs
+            self.chat = SimpleNamespace(
+                completions=SimpleNamespace(create=self.create_message)
+            )
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args) -> None:
+            return None
+
+        async def create_message(self, **kwargs):
+            assert "exatamente 1 prompts" in kwargs["messages"][0]["content"]
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content=(
+                                '{"variations":[{"prompt":"Editorial portrait",'
+                                '"sref":"12345","stylize":250,"ar":"3:2"}]}'
+                            )
+                        )
+                    )
+                ]
+            )
+
+    monkeypatch.setenv("LLM_API_KEY", "sk-dummy-key")
+    monkeypatch.setenv("LLM_BASE_URL", "http://127.0.0.1:8080/v1")
+    monkeypatch.setenv("LLM_MODEL", "local-text-model")
+    monkeypatch.setattr(pipeline_imagens, "AsyncOpenAI", FakeClient)
+
+    prompts = asyncio.run(
+        pipeline_imagens.expandir_estetica_midjourney("editorial", quantidade=1)
+    )
+
+    assert prompts == ["Editorial portrait --sref 12345 --stylize 250 --ar 3:2"]
+
+
+def test_midjourney_web_uses_profile_selectors_and_local_reference(
+    monkeypatch, tmp_path: Path
+) -> None:
+    image_buffer = io.BytesIO()
+    Image.new("RGB", (18, 18), "navy").save(image_buffer, format="PNG")
+    reference = tmp_path / "reference.png"
+    Image.new("RGB", (18, 18), "orange").save(reference)
+
+    class FakeDownload:
+        async def save_as(self, path: str) -> None:
+            Path(path).write_bytes(image_buffer.getvalue())
+
+    class FakeDownloadInfo:
+        def __init__(self) -> None:
+            self.value = asyncio.get_running_loop().create_future()
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args) -> None:
+            self.value.set_result(FakeDownload())
+
+    class FakeLocator:
+        def __init__(self, selector: str) -> None:
+            self.selector = selector
+
+        async def fill(self, value: str, **_kwargs) -> None:
+            assert self.selector == "#prompt"
+            assert value.startswith("https://images.example/reference.jpg\n")
+            assert "--stylize 250" in value
+
+        async def click(self, **_kwargs) -> None:
+            assert self.selector in {"#generate", "#download"}
+
+        async def set_input_files(self, path: str, **_kwargs) -> None:
+            assert self.selector == "input[type=file]"
+            assert Path(path) == reference
+
+    class FakePage:
+        def __init__(self) -> None:
+            self.navigated_to = None
+
+        async def goto(self, url: str, **_kwargs) -> None:
+            self.navigated_to = url
+
+        def locator(self, selector: str) -> FakeLocator:
+            return FakeLocator(selector)
+
+        def expect_download(self, **_kwargs) -> FakeDownloadInfo:
+            return FakeDownloadInfo()
+
+    page = FakePage()
+
+    class FakeContext:
+        pages = [page]
+
+        async def close(self) -> None:
+            return None
+
+    class FakeChromium:
+        async def launch_persistent_context(self, **kwargs) -> FakeContext:
+            assert kwargs["user_data_dir"] == str(tmp_path / "mj-profile")
+            assert kwargs["headless"] is True
+            assert kwargs["accept_downloads"] is True
+            return FakeContext()
+
+    class FakePlaywright:
+        chromium = FakeChromium()
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args) -> None:
+            return None
+
+    monkeypatch.setattr(
+        midjourney_web,
+        "_playwright_context",
+        lambda: FakePlaywright(),
+    )
+    monkeypatch.setenv("MIDJOURNEY_GENERATOR_URL", "https://www.midjourney.com/imagine")
+    monkeypatch.setenv("MIDJOURNEY_PROMPT_SELECTOR", "#prompt")
+    monkeypatch.setenv("MIDJOURNEY_GENERATE_SELECTOR", "#generate")
+    monkeypatch.setenv("MIDJOURNEY_DOWNLOAD_SELECTOR", "#download")
+    monkeypatch.setenv("MIDJOURNEY_REFERENCE_UPLOAD_SELECTOR", "input[type=file]")
+    monkeypatch.setenv("MIDJOURNEY_USER_DATA_DIR", str(tmp_path / "mj-profile"))
+    monkeypatch.setenv("MIDJOURNEY_HEADLESS", "true")
+
+    result = asyncio.run(
+        midjourney_web.gerar_midjourney(
+            "Editorial portrait --stylize 250 --ar 3:2",
+            tmp_path / "generated.png",
+            reference_image=reference,
+            reference_url="https://images.example/reference.jpg",
+        )
+    )
+
+    assert result == tmp_path / "generated.png"
+    assert page.navigated_to == "https://www.midjourney.com/imagine"
+    with Image.open(result) as image:
+        assert image.size == (18, 18)
+
+
+def test_pipeline_routes_midjourney_through_style_explorer_and_web(
+    monkeypatch, tmp_path: Path
+) -> None:
+    async def fake_expand(_aesthetic: str, quantity: int) -> list[str]:
+        assert quantity == 2
+        return [
+            "style one --stylize 100 --ar 1:1",
+            "style two --stylize 200 --ar 3:2",
+        ]
+
+    generated = []
+
+    async def fake_midjourney(prompt, destination, reference_image, reference_url):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(b"generated")
+        generated.append((prompt, reference_image, reference_url))
+        return destination
+
+    reference = tmp_path / "reference.png"
+    reference.write_bytes(b"reference")
+    monkeypatch.setenv("IMAGE_GENERATION_PROVIDER", "midjourney")
+    monkeypatch.setattr(pipeline_imagens, "expandir_estetica_midjourney", fake_expand)
+    monkeypatch.setattr(pipeline_imagens, "gerar_midjourney_web", fake_midjourney)
+
+    result = asyncio.run(
+        pipeline_imagens.gerar_imagens(
+            2,
+            "editorial style",
+            tmp_path / "generated",
+            reference_image=reference,
+            reference_url="https://images.example/style.jpg",
+        )
+    )
+
+    assert len(result) == 2
+    assert generated == [
+        ("style one --stylize 100 --ar 1:1", reference, "https://images.example/style.jpg"),
+        ("style two --stylize 200 --ar 3:2", reference, "https://images.example/style.jpg"),
+    ]
 
 
 def test_kittl_requires_explicit_ui_configuration(monkeypatch, tmp_path: Path) -> None:
@@ -404,9 +590,15 @@ def test_checkpoint_is_written_after_successful_notion_publish(
     async def select_one(paths, _criterion):
         return [pipeline_imagens.ImageAsset("img_0001", paths[0])]
 
-    async def no_generated_images(deficit, _criterion, _output):
+    async def no_generated_images(
+        deficit, _criterion, _output, reference_image=None, reference_url=None
+    ):
         assert deficit == 0
+        assert reference_image == image_path
+        assert reference_url is None
         return []
+
+    monkeypatch.setenv("IMAGE_GENERATION_PROVIDER", "midjourney")
 
     async def publish(_paths, **_kwargs):
         return "https://notion.so/published"
@@ -436,6 +628,7 @@ def test_checkpoint_is_written_after_successful_notion_publish(
 
 def test_api_job_exposes_batch_progress(monkeypatch, tmp_path: Path) -> None:
     async def fake_batch(**kwargs):
+        assert kwargs["reference_url"] == "https://images.example/reference.png"
         await kwargs["progress_callback"](
             {
                 "total": 1,
@@ -461,7 +654,13 @@ def test_api_job_exposes_batch_progress(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(pipeline_imagens, "processar_pastas_locais", fake_batch)
 
     with TestClient(pipeline_imagens.app) as client:
-        start = client.post("/iniciar-curadoria", json={"criterio": "editorial"})
+        start = client.post(
+            "/iniciar-curadoria",
+            json={
+                "criterio": "editorial",
+                "reference_url": "https://images.example/reference.png",
+            },
+        )
         assert start.status_code == 202
         assert local_root.is_dir()
         job_id = start.json()["job_id"]

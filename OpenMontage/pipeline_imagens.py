@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 
 from generators.flux import gerar_flux
 from generators.kittl_automation import gerar_kittl
+from generators.midjourney_web import gerar_midjourney as gerar_midjourney_web
 from lib.env_loader import load_env
 
 TARGET_COUNT = 16
@@ -43,6 +44,18 @@ DEFAULT_CRITERION = (
 )
 REPO_ROOT = Path(__file__).resolve().parent
 DEFAULT_INPUT_DIR = REPO_ROOT / "assets_teste"
+MIDJOURNEY_ASPECT_RATIOS = {
+    "1:1",
+    "4:3",
+    "3:2",
+    "16:9",
+    "21:9",
+    "9:16",
+    "2:3",
+    "3:4",
+    "4:5",
+    "5:4",
+}
 
 
 @dataclass(frozen=True)
@@ -263,13 +276,7 @@ async def selecionar_imagens(
         return []
     if not criterio.strip():
         raise ValueError("The curation criterion must not be empty")
-    base_url = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8080/v1").strip()
-    if not base_url.startswith(("http://", "https://")):
-        raise ValueError("LLM_BASE_URL must be an HTTP(S) URL")
-    api_key = os.environ.get("LLM_API_KEY", "").strip() or "sk-dummy-key"
-    model = os.environ.get("LLM_MODEL", "").strip()
-    if not model:
-        raise RuntimeError("Set LLM_MODEL to a vision-capable model served by the local proxy")
+    api_key, base_url, model = _local_llm_settings()
 
     assets = [
         ImageAsset(asset_id=f"img_{index:04d}", path=path)
@@ -302,6 +309,106 @@ async def selecionar_imagens(
         )
 
 
+def _local_llm_settings() -> tuple[str, str, str]:
+    base_url = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8080/v1").strip()
+    if not base_url.startswith(("http://", "https://")):
+        raise ValueError("LLM_BASE_URL must be an HTTP(S) URL")
+    api_key = os.environ.get("LLM_API_KEY", "").strip() or "sk-dummy-key"
+    model = os.environ.get("LLM_MODEL", "").strip()
+    if not model:
+        raise RuntimeError("Set LLM_MODEL to a model served by the local proxy")
+    return api_key, base_url, model
+
+
+async def expandir_estetica_midjourney(
+    estetica: str,
+    quantidade: int = 1,
+) -> list[str]:
+    """Ask the local LLM for validated Midjourney prompt variants."""
+    if not estetica.strip():
+        raise ValueError("The requested aesthetic must not be empty")
+    if not 1 <= quantidade <= TARGET_COUNT:
+        raise ValueError(f"Midjourney prompt count must be between 1 and {TARGET_COUNT}")
+
+    api_key, base_url, model = _local_llm_settings()
+    request_text = (
+        f"Expanda esta direção estética em exatamente {quantidade} prompts "
+        "distintos para geração no Midjourney:\n"
+        f"{estetica}\n\n"
+        "Responda somente com JSON válido no formato "
+        '{"variations":[{"prompt":"descrição visual","sref":null,'
+        '"stylize":100,"ar":"3:2"}]}. '
+        "Cada prompt deve descrever conteúdo "
+        "visual específico, sem incluir parâmetros --. Use sref null se a "
+        "direção não fornecer uma referência de estilo conhecida; não invente "
+        "códigos. Caso use sref, informe um código numérico ou URL HTTPS. "
+        "stylize deve ser um inteiro de 0 a 1000. ar deve ser um destes valores: "
+        + ", ".join(sorted(MIDJOURNEY_ASPECT_RATIOS))
+        + "."
+    )
+    async with AsyncOpenAI(api_key=api_key, base_url=base_url) as client:
+        response = await client.chat.completions.create(
+            model=model,
+            max_tokens=max(1200, quantidade * 180),
+            messages=[{"role": "user", "content": request_text}],
+        )
+
+    response_text = response.choices[0].message.content
+    if not isinstance(response_text, str):
+        raise ValueError("The local LLM did not return Midjourney prompt text")
+    json_start = response_text.find("{")
+    if json_start < 0:
+        raise ValueError("The local LLM did not return JSON prompt variations")
+    try:
+        result, _ = json.JSONDecoder().raw_decode(response_text[json_start:])
+    except json.JSONDecodeError as exc:
+        raise ValueError("The local LLM returned invalid Midjourney prompt JSON") from exc
+
+    variations = result.get("variations") if isinstance(result, dict) else None
+    if not isinstance(variations, list) or len(variations) != quantidade:
+        raise ValueError(f"The local LLM must return exactly {quantidade} variations")
+
+    prompts = []
+    for variation in variations:
+        if not isinstance(variation, dict):
+            raise ValueError("Each Midjourney variation must be a JSON object")
+        prompt = variation.get("prompt")
+        sref = variation.get("sref")
+        stylize = variation.get("stylize")
+        aspect_ratio = variation.get("ar")
+        if not isinstance(prompt, str) or not prompt.strip():
+            raise ValueError("Each Midjourney variation needs a non-empty prompt")
+        if re.search(r"--[A-Za-z][A-Za-z0-9-]*", prompt):
+            raise ValueError("LLM prompt text must not contain raw style parameters")
+        if sref is not None:
+            if isinstance(sref, int) and not isinstance(sref, bool):
+                sref = str(sref)
+            if not isinstance(sref, str) or not (
+                sref.isdecimal()
+                or (
+                    urlsplit(sref).scheme == "https"
+                    and bool(urlsplit(sref).hostname)
+                    and not urlsplit(sref).username
+                    and not urlsplit(sref).password
+                )
+            ):
+                raise ValueError("Midjourney sref must be null, numeric, or an HTTPS URL")
+        if type(stylize) is not int or not 0 <= stylize <= 1000:
+            raise ValueError("Midjourney stylize must be an integer from 0 to 1000")
+        if (
+            not isinstance(aspect_ratio, str)
+            or aspect_ratio not in MIDJOURNEY_ASPECT_RATIOS
+        ):
+            raise ValueError("LLM returned an unsupported Midjourney aspect ratio")
+
+        parameters = []
+        if sref is not None:
+            parameters.append(f"--sref {sref}")
+        parameters.extend((f"--stylize {stylize}", f"--ar {aspect_ratio}"))
+        prompts.append(f"{prompt.strip()} {' '.join(parameters)}")
+    return prompts
+
+
 def _write_mock_image(provider: str, prompt: str, destination: Path) -> Path:
     digest = hashlib.sha256(f"{provider}:{prompt}".encode("utf-8")).digest()
     background = tuple(40 + value % 150 for value in digest[:3])
@@ -324,16 +431,14 @@ async def gerar_higgsfield(prompt: str, destination: Path) -> Path:
     return await _gerar_mock("Higgsfield", prompt, destination)
 
 
-async def gerar_midjourney(prompt: str, destination: Path) -> Path:
-    return await _gerar_mock("Midjourney", prompt, destination)
-
-
 async def gerar_imagens(
     deficit: int,
     criterio: str,
     output_dir: Path,
+    reference_image: Path | None = None,
+    reference_url: str | None = None,
 ) -> list[Path]:
-    """Fill missing slots with configured FLUX generation or development mocks."""
+    """Fill missing slots using the configured generator or local mocks."""
     if deficit < 0:
         raise ValueError("Image deficit cannot be negative")
     if deficit == 0:
@@ -351,27 +456,53 @@ async def gerar_imagens(
             else "mock"
         )
 
+    if provider == "midjourney":
+        configured_reference = os.environ.get(
+            "MIDJOURNEY_REFERENCE_IMAGE_PATH", ""
+        ).strip()
+        if reference_image is None and configured_reference:
+            reference_image = Path(configured_reference).expanduser()
+        if reference_image is not None and not reference_image.is_file():
+            raise FileNotFoundError(
+                f"Midjourney reference image not found: {reference_image}"
+            )
+        if reference_url is None:
+            reference_url = (
+                os.environ.get("MIDJOURNEY_REFERENCE_IMAGE_URL", "").strip() or None
+            )
+        if reference_url:
+            _validate_midjourney_reference_url(reference_url)
+        prompts = await expandir_estetica_midjourney(criterio, deficit)
+    else:
+        prompts = [
+            (
+                f"Imagem {index + 1} de {deficit}. "
+                f"Use this curation criterion as the creative direction: {criterio}"
+            )
+            for index in range(deficit)
+        ]
+
     jobs = []
     for index in range(deficit):
-        prompt = (
-            f"Imagem {index + 1} de {deficit}. "
-            f"Use this curation criterion as the creative direction: {criterio}"
-        )
+        prompt = prompts[index]
         destination = output_dir / f"{provider}_{index + 1:02d}.png"
         if provider == "flux":
             jobs.append(gerar_flux(prompt, destination))
         elif provider == "kittl":
             jobs.append(gerar_kittl(prompt, destination))
+        elif provider == "midjourney":
+            jobs.append(
+                gerar_midjourney_web(
+                    prompt,
+                    destination,
+                    reference_image=reference_image,
+                    reference_url=reference_url,
+                )
+            )
         elif provider == "mock":
             mock_providers = ("Higgsfield", "Kittl", "Midjourney")
             mock_provider = mock_providers[index % len(mock_providers)]
             jobs.append(_gerar_mock(mock_provider, prompt, destination))
-        elif provider == "midjourney":
-            raise RuntimeError(
-                "Midjourney generation is not available through discord.py: "
-                "Discord user-account automation is not supported. Use a "
-                "manual workflow or an authorized provider integration."
-            )
         else:
             raise ValueError(
                 "IMAGE_GENERATION_PROVIDER must be auto, flux, kittl, mock, "
@@ -537,6 +668,18 @@ def _safe_path_segment(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", value).strip("._") or "folder"
 
 
+def _validate_midjourney_reference_url(value: str) -> str:
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+    ):
+        raise ValueError("Midjourney reference URLs must be public HTTPS URLs")
+    return value
+
+
 def _discover_local_image_folders(root: Path) -> list[Path]:
     if not root.is_dir():
         raise FileNotFoundError(f"Image input directory does not exist: {root}")
@@ -578,6 +721,8 @@ async def executar_pipeline_pasta(
     read_eagle: bool = True,
     recursive_fallback: bool = True,
     output_key: str | None = None,
+    reference_image: Path | None = None,
+    reference_url: str | None = None,
 ) -> dict[str, object]:
     checkpoint_path = local_dir / CHECKPOINT_FILENAME
     if checkpoint_path.is_file():
@@ -611,7 +756,20 @@ async def executar_pipeline_pasta(
 
     key = _safe_path_segment(output_key or folder_name)
     run_dir = output_dir / key / datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    generated = await gerar_imagens(deficit, criterion, run_dir / "mock")
+    if (
+        os.environ.get("IMAGE_GENERATION_PROVIDER", "auto").strip().lower()
+        == "midjourney"
+        and reference_image is None
+        and selected
+    ):
+        reference_image = selected[0].path
+    generated = await gerar_imagens(
+        deficit,
+        criterion,
+        run_dir / "generated",
+        reference_image=reference_image,
+        reference_url=reference_url,
+    )
     final_sources = [asset.path for asset in selected] + generated
     if len(final_sources) != TARGET_COUNT:
         raise RuntimeError(
@@ -688,6 +846,8 @@ async def processar_pastas_locais(
     parent_page_id: str = "",
     dry_run: bool = False,
     progress_callback: ProgressCallback | None = None,
+    reference_image: Path | None = None,
+    reference_url: str | None = None,
 ) -> dict[str, object]:
     load_env()
     folders = await asyncio.to_thread(_discover_local_image_folders, root)
@@ -742,6 +902,8 @@ async def processar_pastas_locais(
                     read_eagle=False,
                     recursive_fallback=False,
                     output_key=folder_label,
+                    reference_image=reference_image,
+                    reference_url=reference_url,
                 )
                 if result["status"] == "skipped":
                     summary["skipped"] = int(summary["skipped"]) + 1
@@ -769,6 +931,7 @@ async def processar_pastas_locais(
 
 class CuradoriaRequest(BaseModel):
     criterio: str = Field(default=DEFAULT_CRITERION, min_length=1, max_length=4000)
+    reference_url: str | None = Field(default=None, max_length=2048)
 
 
 load_env()
@@ -789,7 +952,11 @@ app.add_middleware(
 curation_jobs: dict[str, dict[str, object]] = {}
 
 
-async def _run_api_job(job_id: str, criterio: str) -> None:
+async def _run_api_job(
+    job_id: str,
+    criterio: str,
+    reference_url: str | None = None,
+) -> None:
     job = curation_jobs[job_id]
     job["status"] = "running"
 
@@ -805,6 +972,7 @@ async def _run_api_job(job_id: str, criterio: str) -> None:
             database_id=os.environ.get("NOTION_DATABASE_ID", ""),
             parent_page_id=os.environ.get("NOTION_PARENT_PAGE_ID", ""),
             progress_callback=report_progress,
+            reference_url=reference_url,
         )
         job.update(summary)
         job["status"] = "completed_with_errors" if int(summary["failed"]) else "completed"
@@ -822,6 +990,11 @@ async def iniciar_curadoria(
     load_env()
     if not request.criterio.strip():
         raise HTTPException(status_code=422, detail="criterio must not be empty")
+    if request.reference_url:
+        try:
+            _validate_midjourney_reference_url(request.reference_url)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     active_statuses = {"queued", "running"}
     if any(job.get("status") in active_statuses for job in curation_jobs.values()):
         raise HTTPException(status_code=409, detail="A curation job is already active")
@@ -839,7 +1012,12 @@ async def iniciar_curadoria(
         "errors": [],
         "current_folder": None,
     }
-    background_tasks.add_task(_run_api_job, job_id, request.criterio.strip())
+    background_tasks.add_task(
+        _run_api_job,
+        job_id,
+        request.criterio.strip(),
+        request.reference_url,
+    )
     return {"job_id": job_id, "status": "queued"}
 
 
@@ -862,6 +1040,8 @@ async def executar_pipeline(args: argparse.Namespace) -> None:
             database_id=args.notion_database_id,
             parent_page_id=args.notion_parent_page_id,
             dry_run=args.dry_run,
+            reference_image=args.reference_image,
+            reference_url=args.reference_url,
         )
         print(
             "Lote finalizado: "
@@ -881,6 +1061,8 @@ async def executar_pipeline(args: argparse.Namespace) -> None:
         database_id=args.notion_database_id,
         parent_page_id=args.notion_parent_page_id,
         dry_run=args.dry_run,
+        reference_image=args.reference_image,
+        reference_url=args.reference_url,
     )
     if result["status"] == "skipped":
         print("Checkpoint encontrado; nada a fazer.")
@@ -909,6 +1091,18 @@ def _parse_args() -> argparse.Namespace:
         default=os.environ.get("IMAGE_SELECTION_CRITERION", DEFAULT_CRITERION),
         help="Critério editorial enviado ao modelo de visão do proxy local.",
     )
+    reference_image = os.environ.get("MIDJOURNEY_REFERENCE_IMAGE_PATH", "").strip()
+    parser.add_argument(
+        "--reference-image",
+        type=Path,
+        default=Path(reference_image).expanduser() if reference_image else None,
+        help="Imagem local de referência enviada ao Midjourney (opcional).",
+    )
+    parser.add_argument(
+        "--reference-url",
+        default=os.environ.get("MIDJOURNEY_REFERENCE_IMAGE_URL", "").strip() or None,
+        help="URL HTTPS de imagem usada como referência no prompt do Midjourney.",
+    )
     parser.add_argument(
         "--titulo",
         default=f"Curadoria de imagens {date.today().isoformat()}",
@@ -928,7 +1122,7 @@ def _parse_args() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=REPO_ROOT / "output" / "pipeline_imagens",
-        help="Diretório local dos mocks e WebP resultantes.",
+        help="Diretório local das imagens geradas e WebP resultantes.",
     )
     parser.add_argument(
         "--dry-run",

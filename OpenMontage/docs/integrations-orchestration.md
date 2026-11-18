@@ -80,10 +80,16 @@ Avoid returning script text to public clients or logging it.
 - **LLM:** `pipeline_imagens.py` uses `LLM_BASE_URL`, `LLM_API_KEY`, and
   `LLM_MODEL` with the OpenAI-compatible client, defaulting to the local proxy
   at `http://127.0.0.1:8080/v1`. The selected model must accept image inputs.
-- **Tess, Canva, Midjourney, and Kittl:** credentials and API availability are
-  account/product dependent. Confirm official API access, scopes, and terms
-  before implementing an adapter; these environment variables do not imply
-  that API access is included in a plan.
+- **Tess and Canva:** credentials and API availability are account/product
+  dependent. Confirm official API access and scopes before implementing an
+  adapter; these environment variables do not imply that API access is
+  included in a plan.
+- **Midjourney:** the curation pipeline uses its official web UI with a
+  manually authenticated local Playwright profile. Confirm that this
+  automation is permitted for your account and use the documented visible UI
+  controls; no Discord user-account automation or private API calls are used.
+- **Kittl:** optional Playwright UI automation uses a local browser profile.
+  Enable it only when permitted by the account terms.
 - **Flux:** Flux is from Black Forest Labs, not Google. The repository already
   supports direct BFL credentials (`BFL_API_KEY`) and the fal.ai gateway
   (`FAL_KEY`). `GOOGLE_API_KEY` is for Google AI services, not Flux.
@@ -137,26 +143,43 @@ uploaded to Notion. For a deficit, `IMAGE_GENERATION_PROVIDER=auto` uses the
 existing FLUX adapters when `FAL_KEY`, `FAL_AI_API_KEY`, or `BFL_API_KEY` is
 configured; otherwise it keeps the labeled local mocks for development. Set
 `FLUX_IMAGE_MODEL` to select an adapter-supported fal.ai FLUX model. FLUX API
-calls may incur provider charges. Midjourney remains manual or requires an
-authorized provider integration; the pipeline does not automate a user Discord
-account. Kittl can be selected explicitly with `IMAGE_GENERATION_PROVIDER=kittl`.
-Kittl uses
-Playwright only through the visible UI and normal browser downloads. Enable it
-only when permitted by the account terms, then configure the Kittl page and
-selectors in `.env`. Sign in manually once using a local persistent browser
-profile:
+calls may incur provider charges. Midjourney's Discord workflow remains
+manual; the pipeline does not automate a Discord user account. Its official
+web UI can be selected explicitly with
+`IMAGE_GENERATION_PROVIDER=midjourney`; the local LLM expands the aesthetic
+into validated `--sref`, `--stylize`, and `--ar` prompt variations. For
+image-to-image, each folder uses its first selected image as the default local
+reference; `--reference-image` can override it, and `--reference-url` adds a
+public HTTPS image URL to the prompt. The API accepts `reference_url` in the
+`POST /iniciar-curadoria` JSON body. A Midjourney batch submits one generation
+per missing slot and consumes the plan's generation allowance; review the
+requested deficit before starting a large batch.
+
+Playwright uses only the official visible UI and normal browser downloads.
+Configure its selectors in `.env` to match the controls visible in your
+account. Log in manually once to the ignored persistent profile:
 
 ```bash
 python -m pip install playwright
 python -m playwright install chromium
+python -m generators.midjourney_web --login
 python -m generators.kittl_automation --login
 ```
 
-Set `KITTL_GENERATOR_URL`, `KITTL_PROMPT_SELECTOR`,
-`KITTL_GENERATE_SELECTOR`, and `KITTL_DOWNLOAD_SELECTOR` to match the controls
-in the authorized Kittl interface. The browser profile defaults to the ignored
-`.kittl-profile/` folder; do not share or commit it. The automation does not
-bypass login, CAPTCHAs, or access controls.
+Set `MIDJOURNEY_PROMPT_SELECTOR`, `MIDJOURNEY_GENERATE_SELECTOR`, and
+`MIDJOURNEY_DOWNLOAD_SELECTOR`; optionally set
+`MIDJOURNEY_REFERENCE_UPLOAD_SELECTOR` and `MIDJOURNEY_UPSCALE_SELECTOR`.
+`MIDJOURNEY_GENERATOR_URL` defaults to
+`https://www.midjourney.com/imagine`; the profile defaults to the ignored
+`.midjourney-profile/` directory. The configured download control should
+download the single image intended for that pipeline slot.
+
+Kittl can be selected explicitly with `IMAGE_GENERATION_PROVIDER=kittl`.
+Configure `KITTL_GENERATOR_URL`, `KITTL_PROMPT_SELECTOR`,
+`KITTL_GENERATE_SELECTOR`, and `KITTL_DOWNLOAD_SELECTOR`. Its browser profile
+defaults to the ignored `.kittl-profile/` folder. Both browser integrations
+require manual sign-in and do not bypass login, CAPTCHAs, or access controls.
+
 The default Notion upload cap is 5 MiB per image for compatibility with free
 workspaces; it can be raised up to the API's 20 MiB single-upload limit with
 `NOTION_MAX_IMAGE_BYTES`.

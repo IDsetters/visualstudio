@@ -12,6 +12,8 @@ from weakref import WeakKeyDictionary
 
 from PIL import Image, UnidentifiedImageError
 
+from lib.env_loader import load_env
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PROFILE_DIR = REPO_ROOT / ".kittl-profile"
@@ -160,6 +162,7 @@ async def _login() -> None:
 
 
 def main() -> None:
+    load_env()
     parser = argparse.ArgumentParser(description="Configure a local Kittl session")
     parser.add_argument(
         "--login",

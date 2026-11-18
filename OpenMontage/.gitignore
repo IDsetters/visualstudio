@@ -79,6 +79,7 @@ pixabay_music_*
 *.webp
 .curadoria_status.json
 .kittl-profile/
+.midjourney-profile/
 
 # OS
 .DS_Store
